@@ -1,34 +1,105 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
-import './App.css'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
+import { Spinner } from './components/Components';
+import './App.css';
 
-function App() {
-  return (
-    <div className="app">
-      <Routes>
-        <Route path="/" element={
-          <div className="app-welcome">
-            <div className="welcome-card">
-              <div className="welcome-icon">🚛</div>
-              <h1 className="welcome-title">
-                Transit<span className="text-gradient">Ops</span>
-              </h1>
-              <p className="welcome-subtitle">
-                Smart Transport Operations Platform
-              </p>
-              <p className="welcome-description">
-                Manage your fleet, drivers, trips, maintenance, and expenses — all in one place.
-              </p>
-              <div className="welcome-status">
-                <span className="status-dot"></span>
-                System Initializing...
-              </div>
-            </div>
-          </div>
-        } />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </div>
-  )
+// Layout
+import Layout from './components/Layout';
+
+// Pages
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import Vehicles from './pages/vehicles/Vehicles';
+import Drivers from './pages/drivers/Drivers';
+import Trips from './pages/trips/Trips';
+import Maintenance from './pages/maintenance/Maintenance';
+import Expenses from './pages/expenses/Expenses';
+import Analytics from './pages/reports/Analytics';
+
+function ProtectedRoute({ children, allowedRoles }) {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
 }
 
-export default App
+function App() {
+  const { user } = useAuth();
+
+  return (
+    <Routes>
+      {/* Public Route */}
+      <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
+
+      {/* Protected Routes with Layout */}
+      <Route element={
+        <ProtectedRoute>
+          <Layout />
+        </ProtectedRoute>
+      }>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        
+        {/* All Roles */}
+        <Route path="/dashboard" element={<Dashboard />} />
+
+        {/* Role Specific Routes */}
+        <Route path="/vehicles" element={
+          <ProtectedRoute allowedRoles={['fleet_manager']}>
+            <Vehicles />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/drivers" element={
+          <ProtectedRoute allowedRoles={['fleet_manager', 'safety_officer']}>
+            <Drivers />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/trips" element={
+          <ProtectedRoute allowedRoles={['fleet_manager', 'driver']}>
+            <Trips />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/maintenance" element={
+          <ProtectedRoute allowedRoles={['fleet_manager']}>
+            <Maintenance />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/expenses" element={
+          <ProtectedRoute allowedRoles={['fleet_manager']}>
+            <Expenses />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/analytics" element={
+          <ProtectedRoute allowedRoles={['fleet_manager']}>
+            <Analytics />
+          </ProtectedRoute>
+        } />
+      </Route>
+
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+export default App;

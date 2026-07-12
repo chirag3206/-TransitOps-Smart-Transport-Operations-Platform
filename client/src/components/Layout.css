@@ -1,0 +1,32 @@
+/* ================================================================
+   TransitOps — App Layout Styles
+   ================================================================ */
+
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg-primary);
+}
+
+.main-content {
+  flex: 1;
+  margin-left: 240px;
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.app-layout.sidebar-collapsed .main-content {
+  margin-left: 68px;
+}
+
+.content-area {
+  padding: 28px 32px;
+  max-width: 1400px;
+  min-height: 100vh;
+}
+
+@media (max-width: 768px) {
+  .main-content { margin-left: 0; }
+  .content-area { padding: 16px; }
+}
