@@ -13,7 +13,7 @@
 
 - **🔐 Robust Authentication** — JWT-based sessions with automatic background token refreshes and Role-Based Access Control (RBAC).
 - **📊 Interactive Dashboard** — Real-time KPIs, SVG charts, and operational alerts.
-- **🚗 Vehicle Registry** — Full CRUD with unique registration, status management (Available, In Shop, On Trip), and financial history tracking.
+- **🚗 Vehicle Registry** — Full CRUD with unique registration & status management (Available, In Shop, On Trip), and financial history tracking.
 - **👤 Driver Management** — License expiry warnings, safety score auditing, and assignment tracking.
 - **🗺️ Trip Dispatch Engine** — Full trip lifecycle (Draft → Dispatch → Complete/Cancel) automatically tracking distance, cargo, and fuel consumption.
 - **🔧 Maintenance & Expenses** — Log vehicle repairs (which auto-updates vehicle status) and track operational expenses (Tolls, Fines, Fuel) with category breakdowns.
