@@ -1,6 +1,6 @@
 # 🚛 TransitOps — Smart Transport Operations Platform
 
-> A centralized platform to manage the complete lifecycle of transport operations — from vehicle registration and driver management to dispatching, maintenance, fuel logging, and analytics.
+> A centralized, modern web platform to manage the complete lifecycle of transport operations — from vehicle registration and driver management to dispatching trips, scheduling maintenance, logging fuel, and generating business analytics.
 
 ![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18+-61DAFB?logo=react&logoColor=black)
@@ -9,18 +9,16 @@
 
 ---
 
-## ✨ Features
+## ✨ Key Features
 
-- **🔐 Authentication** — Secure login with email/password and Google OAuth, JWT-based sessions, RBAC (4 roles)
-- **📊 Dashboard** — Real-time KPIs: Active Vehicles, Fleet Utilization, Active Trips, Drivers On Duty
-- **🚗 Vehicle Registry** — Full CRUD with unique registration, status management, lifecycle tracking
-- **👤 Driver Management** — License tracking, safety scores, expiry warnings, compliance monitoring
-- **🗺️ Trip Management** — Draft → Dispatch → Complete lifecycle with automatic status transitions
-- **🔧 Maintenance** — Maintenance logs with automatic vehicle status changes (In Shop ↔ Available)
-- **⛽ Fuel & Expenses** — Fuel logs, toll tracking, per-vehicle operational cost computation
-- **📈 Reports & Analytics** — Fuel Efficiency, Fleet Utilization, Operational Cost, Vehicle ROI with CSV/PDF export
-- **🌙 Dark Mode** — Full dark/light theme support with system preference detection
-- **🔍 Global Search** — Search across vehicles, drivers, and trips instantly
+- **🔐 Robust Authentication** — JWT-based sessions with automatic background token refreshes and Role-Based Access Control (RBAC).
+- **📊 Interactive Dashboard** — Real-time KPIs, SVG charts, and operational alerts.
+- **🚗 Vehicle Registry** — Full CRUD with unique registration, status management (Available, In Shop, On Trip), and financial history tracking.
+- **👤 Driver Management** — License expiry warnings, safety score auditing, and assignment tracking.
+- **🗺️ Trip Dispatch Engine** — Full trip lifecycle (Draft → Dispatch → Complete/Cancel) automatically tracking distance, cargo, and fuel consumption.
+- **🔧 Maintenance & Expenses** — Log vehicle repairs (which auto-updates vehicle status) and track operational expenses (Tolls, Fines, Fuel) with category breakdowns.
+- **📈 Advanced Analytics** — Visual business intelligence leveraging `Chart.js` for monthly revenue trends, expense doughnuts, and driver performance charts.
+- **💅 Premium UI/UX** — Modern Dark-Mode "Glassmorphism" design system with smooth animations, custom components, and responsive layouts.
 
 ---
 
@@ -28,95 +26,110 @@
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 18 + Vite |
-| Styling | Vanilla CSS (Glassmorphism, Animations) |
-| Charts | Chart.js |
-| Backend | Node.js + Express.js |
-| Database | MongoDB Atlas (Free Tier) |
-| Auth | Passport.js + JWT + Google OAuth 2.0 |
-| Caching | node-cache (In-Memory) |
-| Rate Limiting | express-rate-limit |
+| **Frontend** | React 18, React Router v6, Vite |
+| **Styling** | Vanilla CSS (Glassmorphism, Custom Tokens, Modules) |
+| **Charts** | Chart.js (`react-chartjs-2`) |
+| **Backend** | Node.js, Express.js |
+| **Database** | MongoDB & Mongoose |
+| **Security & Auth** | bcryptjs, JSON Web Tokens (Access + Refresh tokens) |
+| **Performance** | `express-rate-limit`, `node-cache` (In-Memory response caching) |
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start & Installation
 
 ### Prerequisites
 
-- Node.js 18+
-- npm 9+
-- MongoDB Atlas account (free tier)
+- **Node.js** (v18 or higher recommended)
+- **npm** (v9+)
+- A **MongoDB** database (Local instance or MongoDB Atlas free tier)
 
-### 1. Clone & Install
+### 1. Clone & Install Dependencies
+
+Clone the repository and run the setup script which will install dependencies for both the root, server, and client directories simultaneously.
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/chirag3206/-TransitOps-Smart-Transport-Operations-Platform.git
 cd transitops
 npm run install:all
 ```
 
-### 2. Configure Environment
+### 2. Configure Environment Variables
+
+Duplicate the example environment file and add your MongoDB connection string.
 
 ```bash
 cp .env.example .env
-# Edit .env with your MongoDB URI, JWT secret, Google OAuth credentials
 ```
 
-### 3. Seed Demo Data (Optional)
+Open `.env` and configure your variables:
+```env
+PORT=5000
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.../transitops
+JWT_SECRET=your-secret-key
+JWT_EXPIRES_IN=1h
+JWT_REFRESH_SECRET=your-refresh-secret
+JWT_REFRESH_EXPIRES_IN=7d
+RATE_LIMIT_MAX_REQUESTS=10000
+```
+
+### 3. Seed the Database with Demo Data (Important)
+
+To instantly populate the platform with 12 months of historical data (Trips, Expenses, Vehicles, Drivers), run the seeder script. **This will also generate your demo login credentials.**
 
 ```bash
-npm run seed
+npm run seed:reset
 ```
 
-### 4. Run Development Server
+### 4. Run the Development Servers
+
+Start both the backend API and the React frontend concurrently:
 
 ```bash
 npm run dev
 ```
 
-This starts both the backend (port 5000) and frontend (port 5173) concurrently.
+The application will be live at: **[http://localhost:5173/](http://localhost:5173/)**
+
+---
+
+## 🔑 Demo Credentials
+
+If you ran the seeder script (`npm run seed:reset`), the following accounts have been generated for you to test Role-Based Access Control (RBAC):
+
+| Role | Email | Password | Allowed Access |
+|------|-------|----------|----------------|
+| **Fleet Manager** | `admin@transitops.com` | `Admin1234` | Full System Access (All pages) |
+| **Safety Officer** | `safety@transitops.com` | `Safety1234` | Only Drivers (License & Safety tracking) |
+| **Driver** | `alex@transitops.com` | `Driver1234` | Only Trips (Dispatch tracking) |
+
+*(Note: The login page includes "Quick Demo" buttons that automatically fill in these credentials for fast testing).*
 
 ---
 
 ## 📁 Project Structure
 
-```
+```text
 transitops/
 ├── client/          # React + Vite Frontend
 │   ├── src/
-│   │   ├── components/   # Reusable UI components
-│   │   ├── context/      # Auth, Theme contexts
-│   │   ├── hooks/        # Custom React hooks
-│   │   ├── pages/        # Page-level components
-│   │   ├── services/     # API service layer
-│   │   ├── styles/       # CSS design system
-│   │   └── utils/        # Helpers & formatters
-│   └── ...
+│   │   ├── components/   # UI Library (KPICards, Modals, StatusBadges)
+│   │   ├── context/      # AuthContext (Session & RBAC state)
+│   │   ├── pages/        # Dashboard, Vehicles, Drivers, Trips, Expenses, Analytics
+│   │   └── services/     # Centralized Axios API with automatic token refresh
 ├── server/          # Node.js + Express Backend
-│   ├── config/      # DB, Passport, env config
-│   ├── controllers/ # Request handlers
-│   ├── middleware/   # Auth, RBAC, rate-limit, cache
-│   ├── models/      # Mongoose schemas
-│   ├── routes/      # Express routes
-│   ├── services/    # Business logic layer
-│   ├── validators/  # Request validators
-│   └── seed/        # Demo data seeder
-└── ...
+│   ├── config/      # DB connection, Env validation, Logger
+│   ├── controllers/ # Route handlers & Business logic
+│   ├── middleware/   # JWT Auth, RBAC Role guards, Rate Limiter, Cache
+│   ├── models/      # Mongoose Database Schemas
+│   ├── routes/      # Express API Router definitions
+│   └── seed/        # Database population scripts
+├── .env             # Environment configuration (ignored in git)
+└── package.json     # Root workspace scripts (dev, build, install)
 ```
-
----
-
-## 👥 User Roles
-
-| Role | Access |
-|------|--------|
-| **Fleet Manager** | Full access — vehicles, maintenance, lifecycle |
-| **Driver** | Trips, vehicle/driver assignment, deliveries |
-| **Safety Officer** | Driver compliance, license validity, safety scores |
-| **Financial Analyst** | Expenses, fuel, maintenance costs, profitability |
 
 ---
 
 ## 📜 License
 
-ISC
+ISC License
