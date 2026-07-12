@@ -125,7 +125,7 @@ If you ran the seeder script (`npm run seed:reset`), the following accounts have
 > **Tip:** The login page includes "Quick Demo" buttons that automatically fill in credentials for fast testing.
 
 ---
-
+ 
 ## 📁 Project Structure
 
 ```text
