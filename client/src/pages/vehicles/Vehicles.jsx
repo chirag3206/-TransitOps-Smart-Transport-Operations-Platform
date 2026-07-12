@@ -23,7 +23,7 @@ const INIT_FORM = {
 };
 
 export default function Vehicles() {
-  const { isFleetManager } = useAuth();
+  const { isFleetManager, isSafetyOfficer } = useAuth();
   const [vehicles, setVehicles]   = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState('');
@@ -150,6 +150,48 @@ export default function Vehicles() {
 
       {error && <Alert type="error" onClose={() => setError('')}>{error}</Alert>}
 
+      {/* Safety Officer Notifications */}
+      {isSafetyOfficer && (
+        <div style={{
+          display: 'flex',
+          gap: 16,
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
+          borderRadius: 8,
+          padding: 16,
+          marginBottom: 20,
+          alignItems: 'center',
+          boxShadow: 'var(--shadow-sm)'
+        }}>
+          <div style={{ fontSize: 24 }}>🚨</div>
+          <div style={{ flex: 1 }}>
+            <h4 style={{ margin: '0 0 4px 0', fontSize: 15, fontWeight: 600 }}>Safety Officer Alert Center</h4>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)' }}>
+              There are{' '}
+              <strong style={{ color: 'var(--text-primary)' }}>
+                {vehicles.filter(v => v.status === 'Pending Maintenance').length}
+              </strong>{' '}
+              vehicles awaiting maintenance approval, and{' '}
+              <strong style={{ color: 'var(--text-primary)' }}>
+                {vehicles.filter(v => v.status === 'In Shop').length}
+              </strong>{' '}
+              active in-workshop.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-sm" style={{ background: '#f97316', color: '#fff', border: 'none' }} onClick={() => setStatus('Pending Maintenance')}>
+              Filter Pending Approval
+            </button>
+            <button className="btn btn-sm btn-secondary" onClick={() => setStatus('In Shop')}>
+              Filter In Workshop
+            </button>
+            <a href="/maintenance" className="btn btn-sm btn-primary">
+              Manage Maintenance
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="filter-bar">
         <input
@@ -164,7 +206,7 @@ export default function Vehicles() {
         </select>
         <select className="input" value={statusFilter} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All Statuses</option>
-          {['Available', 'On Trip', 'In Shop', 'Retired'].map((s) => <option key={s}>{s}</option>)}
+          {['Available', 'On Trip', 'Pending Maintenance', 'In Shop', 'Retired'].map((s) => <option key={s}>{s}</option>)}
         </select>
         <button className="btn btn-ghost" onClick={load}>↺ Refresh</button>
       </div>

@@ -72,12 +72,42 @@ const USERS_DATA = [
     password: 'Safety1234',
     role: 'safety_officer',
   },
+  {
+    name: 'Ravi Kumar',
+    email: 'ravi@transitops.com',
+    password: 'Driver1234',
+    role: 'driver',
+  },
+  {
+    name: 'Sunita Singh',
+    email: 'sunita@transitops.com',
+    password: 'Driver1234',
+    role: 'driver',
+  },
+  {
+    name: 'Manoj Verma',
+    email: 'manoj@transitops.com',
+    password: 'Driver1234',
+    role: 'driver',
+  },
+  {
+    name: 'Anjali Sharma',
+    email: 'anjali@transitops.com',
+    password: 'Driver1234',
+    role: 'driver',
+  },
+  {
+    name: 'Amit Patel',
+    email: 'amit@transitops.com',
+    password: 'Driver1234',
+    role: 'driver',
+  },
 ];
 
 const VEHICLES_DATA = [
   {
     registrationNumber: 'DL-01-AB-1234',
-    name: 'Mumbai Express',
+    name: 'Tata Prima 4930.S',
     type: 'Truck',
     make: 'Tata',
     model: 'Prima 4930.S',
@@ -91,7 +121,7 @@ const VEHICLES_DATA = [
   },
   {
     registrationNumber: 'DL-02-CD-5678',
-    name: 'Delhi Hauler',
+    name: 'Ashok Leyland Captain 4940',
     type: 'Truck',
     make: 'Ashok Leyland',
     model: 'Captain 4940',
@@ -105,7 +135,7 @@ const VEHICLES_DATA = [
   },
   {
     registrationNumber: 'MH-12-EF-9012',
-    name: 'Pune Runner',
+    name: 'Mahindra Blazo X 28',
     type: 'Truck',
     make: 'Mahindra',
     model: 'Blazo X 28',
@@ -119,7 +149,7 @@ const VEHICLES_DATA = [
   },
   {
     registrationNumber: 'GJ-01-GH-3456',
-    name: 'Ahmedabad Van',
+    name: 'Tata Ace Gold',
     type: 'Van',
     make: 'Tata',
     model: 'Ace Gold',
@@ -133,7 +163,7 @@ const VEHICLES_DATA = [
   },
   {
     registrationNumber: 'RJ-14-IJ-7890',
-    name: 'Jaipur Courier',
+    name: 'Force Traveller',
     type: 'Van',
     make: 'Force',
     model: 'Traveller',
@@ -147,7 +177,7 @@ const VEHICLES_DATA = [
   },
   {
     registrationNumber: 'UP-16-KL-2345',
-    name: 'Agra Carrier',
+    name: 'Eicher Pro 3015',
     type: 'Truck',
     make: 'Eicher',
     model: 'Pro 3015',
@@ -161,7 +191,7 @@ const VEHICLES_DATA = [
   },
   {
     registrationNumber: 'HR-26-MN-6789',
-    name: 'Gurgaon Mover',
+    name: 'Volvo FH 520',
     type: 'Truck',
     make: 'Volvo',
     model: 'FH 520',
@@ -175,7 +205,7 @@ const VEHICLES_DATA = [
   },
   {
     registrationNumber: 'KA-03-OP-1357',
-    name: 'Bangalore Bullet',
+    name: 'Tata Winger Cargo',
     type: 'Van',
     make: 'Tata',
     model: 'Winger',
@@ -189,7 +219,7 @@ const VEHICLES_DATA = [
   },
   {
     registrationNumber: 'TN-01-QR-2468',
-    name: 'Chennai Swift',
+    name: 'BharatBenz 1617R',
     type: 'Truck',
     make: 'BharatBenz',
     model: '1617R',
@@ -203,7 +233,7 @@ const VEHICLES_DATA = [
   },
   {
     registrationNumber: 'WB-02-ST-9753',
-    name: 'Kolkata King',
+    name: 'Tata LPS 4018',
     type: 'Truck',
     make: 'Tata',
     model: 'LPS 4018',
@@ -213,6 +243,62 @@ const VEHICLES_DATA = [
     acquisitionCost: 2900000,
     status: 'Available',
     odometer: 198000,
+    totalFuelCost: 0, totalMaintenanceCost: 0, totalRevenue: 0, totalTrips: 0,
+  },
+  {
+    registrationNumber: 'MH-43-XY-1111',
+    name: 'BharatBenz 2823JT Tanker',
+    type: 'Tanker',
+    make: 'BharatBenz',
+    model: '2823JT',
+    year: 2022,
+    fuelType: 'Diesel',
+    maxLoadCapacity: 16000,
+    acquisitionCost: 3500000,
+    status: 'Available',
+    odometer: 12500,
+    totalFuelCost: 0, totalMaintenanceCost: 0, totalRevenue: 0, totalTrips: 0,
+  },
+  {
+    registrationNumber: 'HR-55-AB-2222',
+    name: 'Ashok Leyland U-4019 Flatbed',
+    type: 'Flatbed',
+    make: 'Ashok Leyland',
+    model: 'U-4019',
+    year: 2021,
+    fuelType: 'Diesel',
+    maxLoadCapacity: 22000,
+    acquisitionCost: 4100000,
+    status: 'Available',
+    odometer: 54000,
+    totalFuelCost: 0, totalMaintenanceCost: 0, totalRevenue: 0, totalTrips: 0,
+  },
+  {
+    registrationNumber: 'KA-51-CD-3333',
+    name: 'Tata Ultra 1918.T Reefer',
+    type: 'Refrigerated',
+    make: 'Tata',
+    model: 'Ultra 1918.T',
+    year: 2023,
+    fuelType: 'Diesel',
+    maxLoadCapacity: 10000,
+    acquisitionCost: 3100000,
+    status: 'Available',
+    odometer: 8900,
+    totalFuelCost: 0, totalMaintenanceCost: 0, totalRevenue: 0, totalTrips: 0,
+  },
+  {
+    registrationNumber: 'DL-03-EF-4444',
+    name: 'Tata Yodha Pickup',
+    type: 'Pickup',
+    make: 'Tata',
+    model: 'Yodha',
+    year: 2022,
+    fuelType: 'Diesel',
+    maxLoadCapacity: 1700,
+    acquisitionCost: 850000,
+    status: 'Available',
+    odometer: 15300,
     totalFuelCost: 0, totalMaintenanceCost: 0, totalRevenue: 0, totalTrips: 0,
   },
 ];
@@ -306,6 +392,17 @@ const DRIVERS_DATA = [
     status: 'Available',
     address: '45 Park Street, Kolkata',
   },
+  {
+    name: 'Amit Patel',
+    contactNumber: '9876543218',
+    email: 'amit@transitops.com',
+    licenseNumber: 'GJ-2021-9876543',
+    licenseExpiryDate: daysFrom(240),
+    licenseCategory: 'LMV',
+    safetyScore: 90,
+    status: 'Available',
+    address: '89 Satellite Road, Ahmedabad',
+  },
 ];
 
 
@@ -313,15 +410,7 @@ const DRIVERS_DATA = [
 // ────────────────────────────────────────────────────
 // Database Connection
 // ────────────────────────────────────────────────────
-const connectDB = async () => {
-  const uri = process.env.MONGODB_URI;
-  if (!uri) {
-    console.error('❌  MONGODB_URI not set in .env');
-    process.exit(1);
-  }
-  await mongoose.connect(uri);
-  console.log('✅  MongoDB connected');
-};
+const connectDB = require('../config/db');
 
 // ────────────────────────────────────────────────────
 // Destroy — wipe all collections
@@ -386,7 +475,7 @@ const seedData = async () => {
     }
     const driver = await Driver.create(d);
     drivers.push(driver);
-    const expDays = Math.round((d.licenseExpiry - Date.now()) / 86400_000);
+    const expDays = Math.round((d.licenseExpiryDate - Date.now()) / 86400_000);
     console.log(`   ✓ ${d.name.padEnd(18)} score=${d.safetyScore} expires_in=${expDays}d`);
   }
 
@@ -537,7 +626,7 @@ const seedData = async () => {
     vehicle:       inShopVehicle._id,
     type:          'Engine Repair',
     description:   'Engine oil leak detected — requires full inspection and gasket replacement',
-    status:        'Active',
+    status:        'In Workshop',
     estimatedCost: 18000,
     workshopName:  'Tata Authorised Service Centre',
     odometerReading: inShopVehicle.odometer,
@@ -691,39 +780,58 @@ const printSummary = async () => {
   console.log('  │ Fleet Manager:  rahul@transitops.com   │');
   console.log('  │ Password:       Manager1234            │');
   console.log('  ├────────────────────────────────────────┤');
-  console.log('  │ Driver:         alex@transitops.com    │');
-  console.log('  │ Password:       Driver1234             │');
-  console.log('  ├────────────────────────────────────────┤');
   console.log('  │ Safety Officer: safety@transitops.com  │');
   console.log('  │ Password:       Safety1234             │');
+  console.log('  ├────────────────────────────────────────┤');
+  console.log('  │ Driver 1:       alex@transitops.com    │');
+  console.log('  │ Password:       Driver1234             │');
+  console.log('  ├────────────────────────────────────────┤');
+  console.log('  │ Driver 2:       priya@transitops.com   │');
+  console.log('  │ Password:       Driver1234             │');
+  console.log('  ├────────────────────────────────────────┤');
+  console.log('  │ Driver 3:       ravi@transitops.com    │');
+  console.log('  │ Password:       Driver1234             │');
+  console.log('  ├────────────────────────────────────────┤');
+  console.log('  │ Driver 4:       sunita@transitops.com  │');
+  console.log('  │ Password:       Driver1234             │');
+  console.log('  ├────────────────────────────────────────┤');
+  console.log('  │ Driver 5:       manoj@transitops.com   │');
+  console.log('  │ Password:       Driver1234             │');
+  console.log('  ├────────────────────────────────────────┤');
+  console.log('  │ Driver 6:       anjali@transitops.com  │');
+  console.log('  │ Password:       Driver1234             │');
   console.log('  └────────────────────────────────────────┘\n');
 };
 
 // ────────────────────────────────────────────────────
 // Main
 // ────────────────────────────────────────────────────
-(async () => {
-  try {
-    await connectDB();
+module.exports = { seedData, destroyData, printSummary };
 
-    const args = process.argv.slice(2);
+if (require.main === module) {
+  (async () => {
+    try {
+      await connectDB();
 
-    if (args.includes('--destroy')) {
-      await destroyData();
+      const args = process.argv.slice(2);
+
+      if (args.includes('--destroy')) {
+        await destroyData();
+        process.exit(0);
+      }
+
+      if (args.includes('--fresh')) {
+        console.log('🗑️  --fresh flag: destroying existing data...');
+        await destroyData();
+      }
+
+      await seedData();
+      await printSummary();
       process.exit(0);
+    } catch (err) {
+      console.error('\n❌  Seeder failed:', err.message);
+      console.error(err.stack);
+      process.exit(1);
     }
-
-    if (args.includes('--fresh')) {
-      console.log('🗑️  --fresh flag: destroying existing data...');
-      await destroyData();
-    }
-
-    await seedData();
-    await printSummary();
-    process.exit(0);
-  } catch (err) {
-    console.error('\n❌  Seeder failed:', err.message);
-    console.error(err.stack);
-    process.exit(1);
-  }
-})();
+  })();
+}

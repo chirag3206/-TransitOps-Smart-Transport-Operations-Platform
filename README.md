@@ -97,13 +97,32 @@ The application will be live at: **[http://localhost:5173/](http://localhost:517
 
 If you ran the seeder script (`npm run seed:reset`), the following accounts have been generated for you to test Role-Based Access Control (RBAC):
 
-| Role | Email | Password | Allowed Access |
-|------|-------|----------|----------------|
-| **Fleet Manager** | `admin@transitops.com` | `Admin1234` | Full System Access (All pages) |
-| **Safety Officer** | `safety@transitops.com` | `Safety1234` | Only Drivers (License & Safety tracking) |
-| **Driver** | `alex@transitops.com` | `Driver1234` | Only Trips (Dispatch tracking) |
+### Fleet Managers
 
-*(Note: The login page includes "Quick Demo" buttons that automatically fill in these credentials for fast testing).*
+| Email | Password | Access |
+|-------|----------|--------|
+| `admin@transitops.com` | `Admin1234` | Full System Access — Vehicles, Drivers, Trips, Maintenance, Fuel, Expenses, Analytics |
+| `rahul@transitops.com` | `Manager1234` | Full System Access |
+
+### Safety Officer
+
+| Email | Password | Access |
+|-------|----------|--------|
+| `safety@transitops.com` | `Safety1234` | Vehicles, Maintenance (Approve / Mark Ready) |
+
+### Drivers
+
+| Name | Email | Password |
+|------|-------|----------|
+| Alex Driver | `alex@transitops.com` | `Driver1234` |
+| Priya Patel | `priya@transitops.com` | `Driver1234` |
+| Ravi Kumar | `ravi@transitops.com` | `Driver1234` |
+| Sunita Singh | `sunita@transitops.com` | `Driver1234` |
+| Manoj Verma | `manoj@transitops.com` | `Driver1234` |
+| Anjali Sharma | `anjali@transitops.com` | `Driver1234` |
+| Amit Patel | `amit@transitops.com` | `Driver1234` |
+
+> **Tip:** The login page includes "Quick Demo" buttons that automatically fill in credentials for fast testing.
 
 ---
 

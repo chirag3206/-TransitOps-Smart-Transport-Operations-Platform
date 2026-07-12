@@ -11,7 +11,7 @@
 const router = require('express').Router();
 const {
   getMaintenanceRecords, getMaintenanceById,
-  createMaintenance, closeMaintenance,
+  createMaintenance, approveMaintenance, closeMaintenance,
   updateMaintenance, deleteMaintenance,
 } = require('../controllers/maintenance.controller');
 
@@ -29,8 +29,9 @@ router.get('/', listMaintenanceRules, validate, cacheMiddleware(CACHE_TTLS.MAINT
 router.get('/:id', cacheMiddleware(CACHE_TTLS.MAINTENANCE, 'maintenance-detail'), getMaintenanceById);
 
 router.post('/', writeLimiter, onlyFleetManager, createMaintenanceRules, validate, createMaintenance);
-router.post('/:id/close', writeLimiter, onlyFleetManager, closeMaintenanceRules, validate, closeMaintenance);
-router.put('/:id', writeLimiter, onlyFleetManager, updateMaintenanceRules, validate, updateMaintenance);
-router.delete('/:id', writeLimiter, onlyFleetManager, deleteMaintenance);
+router.post('/:id/approve', writeLimiter, approveMaintenance);
+router.post('/:id/close', writeLimiter, closeMaintenanceRules, validate, closeMaintenance);
+router.put('/:id', writeLimiter, updateMaintenanceRules, validate, updateMaintenance);
+router.delete('/:id', writeLimiter, deleteMaintenance);
 
 module.exports = router;

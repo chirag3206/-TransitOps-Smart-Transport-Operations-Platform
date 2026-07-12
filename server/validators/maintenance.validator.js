@@ -16,7 +16,8 @@ const createMaintenanceRules = [
     .withMessage(`Type must be one of: ${Object.values(MAINTENANCE_TYPE).join(', ')}`),
 
   body('description')
-    .trim().notEmpty().withMessage('Description is required')
+    .optional()
+    .trim()
     .isLength({ max: 500 }).withMessage('Description cannot exceed 500 characters'),
 
   body('estimatedCost')

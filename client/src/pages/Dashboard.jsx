@@ -3,9 +3,8 @@
  * Live KPI cards, fleet health, active trips, license alerts, revenue trend
  */
 import { useState, useEffect } from 'react';
-import { analyticsAPI } from '../services/api';
-import { KPICard, Spinner, StatusBadge, Alert } from '../components/Components';
-import { PageHeader } from '../components/Components';
+import { analyticsAPI, tripAPI } from '../services/api';
+import { KPICard, Spinner, StatusBadge, Alert, Modal, FormField, PageHeader } from '../components/Components';
 import { useAuth } from '../context/AuthContext';
 import './Dashboard.css';
 
@@ -41,6 +40,10 @@ export default function Dashboard() {
   if (error) return <Alert type="error">{error}</Alert>;
 
   const d = data;
+  if (d?.role === 'driver') {
+    return <DriverDashboard data={d} user={user} refresh={load} />;
+  }
+
   const fleet      = d?.fleet      || {};
   const drivers    = d?.drivers    || {};
   const trips      = d?.trips      || {};
@@ -106,9 +109,10 @@ export default function Dashboard() {
           <h3 className="dash-card-title">🚛 Fleet Status</h3>
           <div className="status-donut-wrap">
             <div className="status-rows">
-              <StatusRow label="Available" count={fleet.available} color="#10b981" total={fleet.total} />
-              <StatusRow label="On Trip"   count={fleet.onTrip}   color="#0ea5e9" total={fleet.total} />
-              <StatusRow label="In Shop"   count={fleet.inShop}   color="#f59e0b" total={fleet.total} />
+              <StatusRow label="Available"           count={fleet.available}          color="#10b981" total={fleet.total} />
+              <StatusRow label="On Trip"             count={fleet.onTrip}             color="#0ea5e9" total={fleet.total} />
+              <StatusRow label="Pending Maintenance" count={fleet.pendingMaintenance}  color="#f97316" total={fleet.total} />
+              <StatusRow label="In Shop"             count={fleet.inShop}             color="#f59e0b" total={fleet.total} />
             </div>
             <div className="utilization-ring">
               <svg viewBox="0 0 80 80">
@@ -201,21 +205,32 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Maintenance Alerts */}
+        {/* Maintenance Progress */}
         <div className="dash-card dash-full">
-          <h3 className="dash-card-title">🔧 Active Maintenance ({d?.activeMaintenance || 0})</h3>
+          <h3 className="dash-card-title">🔧 Maintenance Progress ({d?.activeMaintenance || 0} active)</h3>
           {(d?.activeMaintenance || 0) === 0 ? (
             <div className="no-alerts">
               <span>✅</span>
-              <span>No vehicles currently in maintenance</span>
+              <span>No vehicles currently in maintenance pipeline</span>
             </div>
           ) : (
-            <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: 0 }}>
-              {d?.activeMaintenance} vehicle{d?.activeMaintenance !== 1 ? 's are' : ' is'} currently in shop.
-              <a href="/maintenance" style={{ color: 'var(--primary-500)', marginLeft: 8 }}>
-                View maintenance →
+            <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ background: '#f97316', width: 10, height: 10, borderRadius: '50%', display: 'inline-block' }} />
+                <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
+                  <strong style={{ color: 'var(--text-primary)' }}>{fleet.pendingMaintenance || 0}</strong> awaiting inspector approval
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ background: '#f59e0b', width: 10, height: 10, borderRadius: '50%', display: 'inline-block' }} />
+                <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
+                  <strong style={{ color: 'var(--text-primary)' }}>{fleet.inShop || 0}</strong> currently in workshop
+                </span>
+              </div>
+              <a href="/maintenance" style={{ color: 'var(--primary-500)', fontSize: 14, marginLeft: 'auto' }}>
+                View maintenance log →
               </a>
-            </p>
+            </div>
           )}
         </div>
       </div>
@@ -266,4 +281,186 @@ function getTimeOfDay() {
   if (h < 12) return 'morning';
   if (h < 17) return 'afternoon';
   return 'evening';
+}
+
+function DriverDashboard({ data, user, refresh }) {
+  const { driver, stats, activeTrip, upcomingTrip, pendingTrip } = data;
+  
+  const [showStart, setShowStart] = useState(false);
+  const [showFinish, setShowFinish] = useState(false);
+  const [startForm, setStartForm] = useState({ startOdometer: '' });
+  const [finishForm, setFinishForm] = useState({ endOdometer: '', fuelConsumed: '' });
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  const handleStartTrip = async (e) => {
+    e.preventDefault();
+    setSaving(true); setFormError('');
+    try {
+      await tripAPI.driverStart(activeTrip._id, startForm);
+      setShowStart(false); refresh();
+    } catch (e) {
+      setFormError(e.response?.data?.message || 'Failed to start trip');
+    } finally { setSaving(false); }
+  };
+
+  const handleFinishTrip = async (e) => {
+    e.preventDefault();
+    setSaving(true); setFormError('');
+    try {
+      await tripAPI.driverFinish(activeTrip._id, finishForm);
+      setShowFinish(false); refresh();
+    } catch (e) {
+      setFormError(e.response?.data?.message || 'Failed to finish trip');
+    } finally { setSaving(false); }
+  };
+
+  // Determine vehicle info from activeTrip, pendingTrip, or upcomingTrip
+  const currentVehicle = (activeTrip || pendingTrip || upcomingTrip)?.vehicle;
+
+  return (
+    <div className="dashboard driver-dashboard">
+      <PageHeader
+        title={`Welcome back, ${user?.name?.split(' ')[0]} 🚛`}
+        subtitle="Here's your current assignment and driving stats."
+      />
+
+      {/* KPI Cards */}
+      <div className="kpi-grid">
+        <KPICard title="Trips Completed" value={stats.completedTrips} icon="🏁" color="primary" />
+        <KPICard title="Distance Driven" value={`${stats.totalDistance} km`} icon="🛣️" color="info" />
+        <KPICard title="Vehicle Issued" value={currentVehicle?.registrationNumber || 'None'} sub={currentVehicle?.name || 'Off-duty'} icon="🚛" color={currentVehicle ? 'purple' : 'warning'} />
+        <KPICard title="Safety Score" value={`${stats.safetyScore}/100`} sub={stats.safetyScore >= 80 ? "Excellent!" : "Keep it up"} icon="🛡️" color={stats.safetyScore >= 80 ? 'success' : 'warning'} />
+      </div>
+
+      <div className="dashboard-grid" style={{ marginTop: 24 }}>
+
+        {/* Active Trip — Dispatched (driver needs to START) */}
+        {activeTrip && activeTrip.status === 'Dispatched' && (
+          <div className="dash-card dash-full" style={{ borderLeft: '4px solid #3b82f6' }}>
+            <h3 className="dash-card-title">📩 New Trip Dispatched by Manager</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>{activeTrip.source} → {activeTrip.destination}</div>
+                <div style={{ color: 'var(--text-secondary)', marginTop: 8 }}>
+                  Vehicle: <strong>{activeTrip.vehicle?.registrationNumber}</strong> · 
+                  Distance: <strong>{activeTrip.plannedDistance} km</strong> · 
+                  Cargo: <strong>{activeTrip.cargoWeight} kg</strong>
+                </div>
+              </div>
+              <button className="btn btn-primary" style={{ padding: '12px 24px', fontSize: 16 }}
+                onClick={() => { setShowStart(true); setStartForm({ startOdometer: activeTrip.vehicle?.odometer || '' }); setFormError(''); }}>
+                🚀 Start Trip
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Active Trip — In Progress (driver needs to FINISH) */}
+        {activeTrip && activeTrip.status === 'In Progress' && (
+          <div className="dash-card dash-full" style={{ borderLeft: '4px solid #10b981' }}>
+            <h3 className="dash-card-title">🚨 Trip In Progress</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>{activeTrip.source} → {activeTrip.destination}</div>
+                <div style={{ color: 'var(--text-secondary)', marginTop: 8 }}>
+                  Vehicle: <strong>{activeTrip.vehicle?.registrationNumber}</strong> · 
+                  Start Odometer: <strong>{activeTrip.startOdometer} km</strong> · 
+                  Cargo: <strong>{activeTrip.cargoWeight} kg</strong>
+                </div>
+              </div>
+              <button className="btn btn-primary" style={{ background: '#10b981', borderColor: '#10b981', padding: '12px 24px', fontSize: 16 }}
+                onClick={() => { setShowFinish(true); setFinishForm({ endOdometer: '', fuelConsumed: '' }); setFormError(''); }}>
+                🏁 Finish Trip
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Pending Completion — Waiting for Manager Approval */}
+        {pendingTrip && (
+          <div className="dash-card dash-full" style={{ borderLeft: '4px solid #f59e0b' }}>
+            <h3 className="dash-card-title">⏳ Awaiting Manager Approval</h3>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 600 }}>{pendingTrip.source} → {pendingTrip.destination}</div>
+              <div style={{ color: 'var(--text-secondary)', marginTop: 8 }}>
+                Vehicle: <strong>{pendingTrip.vehicle?.registrationNumber}</strong> · 
+                Distance: <strong>{pendingTrip.actualDistance || pendingTrip.plannedDistance} km</strong> · 
+                Fuel Used: <strong>{pendingTrip.fuelConsumed} L</strong>
+              </div>
+              <div style={{ marginTop: 12, padding: '10px 16px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: 8, color: '#f59e0b', fontSize: 14 }}>
+                ⏳ Your trip data has been submitted. Waiting for the fleet manager to review and approve.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* No active trip and no pending — show upcoming or off-duty */}
+        {!activeTrip && !pendingTrip && (
+          <div className="dash-card dash-full" style={{ borderLeft: '4px solid #64748b' }}>
+            <h3 className="dash-card-title">🚛 Trip Status</h3>
+            {upcomingTrip ? (
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 600 }}>{upcomingTrip.source} → {upcomingTrip.destination}</div>
+                <div style={{ color: 'var(--text-secondary)', marginTop: 8 }}>
+                  Vehicle: <strong>{upcomingTrip.vehicle?.registrationNumber}</strong> · 
+                  Distance: <strong>{upcomingTrip.plannedDistance} km</strong>
+                </div>
+                <div style={{ marginTop: 12, padding: '10px 16px', background: 'rgba(99, 102, 241, 0.1)', borderRadius: 8, color: '#818cf8', fontSize: 14 }}>
+                  📋 This trip is drafted but not yet dispatched by the manager. You'll be notified when it's dispatched.
+                </div>
+              </div>
+            ) : (
+              <div style={{ color: 'var(--text-secondary)' }}>You're off-duty. No trips currently assigned.</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Start Trip Modal */}
+      <Modal open={showStart} onClose={() => setShowStart(false)} title="Start Trip" size="sm">
+        <form onSubmit={handleStartTrip}>
+          {formError && <Alert type="error">{formError}</Alert>}
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 16 }}>
+            Ready to start <strong>{activeTrip?.source} → {activeTrip?.destination}</strong>?
+          </p>
+          <FormField label="Current Odometer Reading (km)" required>
+            <input className="input" type="number" value={startForm.startOdometer}
+              onChange={(e) => setStartForm({ ...startForm, startOdometer: +e.target.value })} required min="0" />
+          </FormField>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+            <button type="button" className="btn btn-ghost" onClick={() => setShowStart(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? 'Starting...' : '🚀 Start Trip'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Finish Trip Modal */}
+      <Modal open={showFinish} onClose={() => setShowFinish(false)} title="Finish Trip" size="sm">
+        <form onSubmit={handleFinishTrip}>
+          {formError && <Alert type="error">{formError}</Alert>}
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 16 }}>
+            Finishing <strong>{activeTrip?.source} → {activeTrip?.destination}</strong>.
+            Enter your final readings below.
+          </p>
+          <FormField label="End Odometer Reading (km)" required>
+            <input className="input" type="number" value={finishForm.endOdometer}
+              onChange={(e) => setFinishForm({ ...finishForm, endOdometer: +e.target.value })} required min="0" />
+          </FormField>
+          <FormField label="Fuel Consumed (Litres)" required>
+            <input className="input" type="number" step="0.1" value={finishForm.fuelConsumed}
+              onChange={(e) => setFinishForm({ ...finishForm, fuelConsumed: +e.target.value })} required min="0" />
+          </FormField>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+            <button type="button" className="btn btn-ghost" onClick={() => setShowFinish(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? 'Submitting...' : '🏁 Submit & Finish'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
 }

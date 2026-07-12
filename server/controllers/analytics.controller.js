@@ -34,6 +34,55 @@ const dateRange = (field, fromDate, toDate) => {
 // One-shot KPI card data for the fleet manager dashboard
 // ─────────────────────────────────────────────────
 const getDashboard = async (req, res) => {
+  if (req.user.role === 'driver') {
+    const driver = await Driver.findOne({ email: req.user.email }).lean({ virtuals: true });
+    if (!driver) {
+      return sendSuccess(res, 200, 'Driver profile not found', { role: 'driver', driver: null });
+    }
+
+    const [activeTrips, upcomingTrip, pendingTrip, completedTripsCount, totalDistanceResult] = await Promise.all([
+      // Trips that are Dispatched or In Progress (driver needs to act)
+      Trip.find({ driver: driver._id, status: { $in: ['Dispatched', 'In Progress'] } })
+        .populate('vehicle', 'registrationNumber name type make model odometer')
+        .lean({ virtuals: true }),
+      // Draft trips (upcoming, assigned but not yet dispatched)
+      Trip.findOne({ driver: driver._id, status: 'Draft' })
+        .populate('vehicle', 'registrationNumber name type make model odometer')
+        .lean({ virtuals: true }),
+      // Trips pending manager approval
+      Trip.findOne({ driver: driver._id, status: 'Pending Completion' })
+        .populate('vehicle', 'registrationNumber name type make model odometer')
+        .lean({ virtuals: true }),
+      Trip.countDocuments({ driver: driver._id, status: 'Completed' }),
+      Trip.aggregate([
+        { $match: { driver: driver._id, status: 'Completed' } },
+        { $group: { _id: null, totalDistance: { $sum: '$actualDistance' } } }
+      ])
+    ]);
+
+    // Pick the most relevant active trip (In Progress first, then Dispatched)
+    const inProgressTrip = activeTrips.find(t => t.status === 'In Progress') || null;
+    const dispatchedTrip = activeTrips.find(t => t.status === 'Dispatched') || null;
+    const activeTrip = inProgressTrip || dispatchedTrip;
+
+    const totalDistance = totalDistanceResult[0]?.totalDistance || driver.totalDistance || 0;
+    const diff = driver.licenseExpiryDate ? new Date(driver.licenseExpiryDate) - new Date() : 0;
+    const daysUntilExpiry = Math.ceil(diff / (1000 * 60 * 60 * 24));
+
+    return sendSuccess(res, 200, 'Driver dashboard data retrieved', {
+      role: 'driver',
+      driver: { ...driver, daysUntilExpiry },
+      stats: {
+        completedTrips: completedTripsCount || driver.completedTrips || 0,
+        totalDistance: Math.round(totalDistance),
+        safetyScore: driver.safetyScore,
+      },
+      activeTrip,
+      upcomingTrip,
+      pendingTrip,
+    });
+  }
+
   const [
     vehicleStats,
     driverStats,
@@ -41,6 +90,7 @@ const getDashboard = async (req, res) => {
     financials,
     activeMaintenance,
     recentTrips,
+    licenseAlerts,
   ] = await Promise.all([
     // Vehicle status counts
     Vehicle.aggregate([
@@ -75,16 +125,25 @@ const getDashboard = async (req, res) => {
       ]),
     ]),
 
-    // Active maintenance count (vehicles in shop)
-    Maintenance.countDocuments({ status: 'Active' }),
+    // Active maintenance count (pending approval or in workshop)
+    Maintenance.countDocuments({ status: { $in: ['Pending Approval', 'In Workshop'] } }),
 
-    // 5 most recent completed/dispatched trips
-    Trip.find({ status: { $in: ['Dispatched', 'Completed'] } })
+    // 5 most recent active/completed trips
+    Trip.find({ status: { $in: ['Dispatched', 'In Progress', 'Pending Completion', 'Completed'] } })
       .sort({ updatedAt: -1 }).limit(5)
       .populate('vehicle', 'registrationNumber name')
       .populate('driver', 'name')
       .select('source destination status revenue computedDistance createdAt')
       .lean(),
+
+    // Drivers with license expiring in 30 days
+    Driver.find({
+      licenseExpiryDate: {
+        $gte: new Date(),
+        $lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+      status: { $ne: 'Suspended' },
+    }).select('name licenseNumber licenseExpiryDate safetyScore status').lean(),
   ]);
 
   // Normalize vehicle stats into a map
@@ -112,6 +171,7 @@ const getDashboard = async (req, res) => {
       total: totalVehicles,
       available: vMap['Available'] || 0,
       onTrip: vMap['On Trip'] || 0,
+      pendingMaintenance: vMap['Pending Maintenance'] || 0,
       inShop: vMap['In Shop'] || 0,
       retired: vMap['Retired'] || 0,
       utilizationRate,
@@ -125,7 +185,7 @@ const getDashboard = async (req, res) => {
     trips: {
       total: Object.values(tMap).reduce((a, b) => a + b, 0),
       draft: tMap['Draft'] || 0,
-      dispatched: tMap['Dispatched'] || 0,
+      dispatched: (tMap['Dispatched'] || 0) + (tMap['In Progress'] || 0) + (tMap['Pending Completion'] || 0),
       completed: tMap['Completed'] || 0,
       cancelled: tMap['Cancelled'] || 0,
     },
@@ -135,6 +195,10 @@ const getDashboard = async (req, res) => {
       totalFuelCost: parseFloat(totalFuelCost.toFixed(2)),
       totalMaintenanceCost: parseFloat(totalMaintenanceCost.toFixed(2)),
       totalExpenses: parseFloat(totalExpenses.toFixed(2)),
+      // Map to expected frontend dashboard keys
+      fuelCosts: parseFloat(totalFuelCost.toFixed(2)),
+      maintenanceCosts: parseFloat(totalMaintenanceCost.toFixed(2)),
+      otherExpenses: parseFloat(totalExpenses.toFixed(2)),
       netProfit: parseFloat(netProfit.toFixed(2)),
       profitMargin: totalRevenue > 0
         ? parseFloat((netProfit / totalRevenue * 100).toFixed(1))
@@ -142,6 +206,7 @@ const getDashboard = async (req, res) => {
     },
     activeMaintenance,
     recentActivity: recentTrips,
+    licenseAlerts,
     generatedAt: new Date().toISOString(),
   });
 };
@@ -468,12 +533,12 @@ const getDriverStats = async (req, res) => {
 
     // Drivers with license expiring in 30 days
     Driver.find({
-      licenseExpiry: {
+      licenseExpiryDate: {
         $gte: new Date(),
         $lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
       status: { $ne: 'Suspended' },
-    }).select('name licenseNumber licenseExpiry safetyScore status').lean(),
+    }).select('name licenseNumber licenseExpiryDate safetyScore status').lean(),
   ]);
 
   sendSuccess(res, 200, 'Driver statistics retrieved', {

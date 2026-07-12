@@ -170,14 +170,20 @@ tripSchema.virtual('durationMinutes').get(function () {
 
 /** Check if vehicle is currently on an active trip */
 tripSchema.statics.isVehicleOnTrip = async function (vehicleId, excludeTripId = null) {
-  const query = { vehicle: vehicleId, status: TRIP_STATUS.DISPATCHED };
+  const query = {
+    vehicle: vehicleId,
+    status: { $in: [TRIP_STATUS.DISPATCHED, TRIP_STATUS.IN_PROGRESS, TRIP_STATUS.PENDING_COMPLETION] },
+  };
   if (excludeTripId) query._id = { $ne: excludeTripId };
   return (await this.countDocuments(query)) > 0;
 };
 
 /** Check if driver is currently on an active trip */
 tripSchema.statics.isDriverOnTrip = async function (driverId, excludeTripId = null) {
-  const query = { driver: driverId, status: TRIP_STATUS.DISPATCHED };
+  const query = {
+    driver: driverId,
+    status: { $in: [TRIP_STATUS.DISPATCHED, TRIP_STATUS.IN_PROGRESS, TRIP_STATUS.PENDING_COMPLETION] },
+  };
   if (excludeTripId) query._id = { $ne: excludeTripId };
   return (await this.countDocuments(query)) > 0;
 };
