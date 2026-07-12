@@ -45,7 +45,7 @@ function App() {
   return (
     <Routes>
       {/* Public Route */}
-      <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
+      <Route path="/login" element={user ? <Navigate to={user.role === 'driver' ? '/trips' : user.role === 'safety_officer' ? '/drivers' : '/dashboard'} replace /> : <Login />} />
 
       {/* Protected Routes with Layout */}
       <Route element={
@@ -53,10 +53,14 @@ function App() {
           <Layout />
         </ProtectedRoute>
       }>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<Navigate to={user?.role === 'driver' ? '/trips' : user?.role === 'safety_officer' ? '/drivers' : '/dashboard'} replace />} />
         
-        {/* All Roles */}
-        <Route path="/dashboard" element={<Dashboard />} />
+        {/* Role Specific Routes */}
+        <Route path="/dashboard" element={
+          <ProtectedRoute allowedRoles={['fleet_manager']}>
+            <Dashboard />
+          </ProtectedRoute>
+        } />
 
         {/* Role Specific Routes */}
         <Route path="/vehicles" element={

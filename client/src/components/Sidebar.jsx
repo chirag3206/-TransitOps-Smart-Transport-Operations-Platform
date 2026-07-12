@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import './Sidebar.css';
 
 const NAV_ITEMS = [
-  { path: '/dashboard',   label: 'Dashboard',    icon: '▦',  roles: ['fleet_manager', 'driver', 'safety_officer'] },
+  { path: '/dashboard',   label: 'Dashboard',    icon: '▦',  roles: ['fleet_manager'] },
   { path: '/vehicles',    label: 'Vehicles',     icon: '🚛', roles: ['fleet_manager'] },
   { path: '/drivers',     label: 'Drivers',      icon: '👤', roles: ['fleet_manager', 'safety_officer'] },
   { path: '/trips',       label: 'Trips',        icon: '🗺', roles: ['fleet_manager', 'driver'] },

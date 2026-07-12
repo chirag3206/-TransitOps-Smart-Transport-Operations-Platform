@@ -20,7 +20,7 @@ export default function Login() {
     setLoading(true);
     try {
       const user = await login(form);
-      navigate('/dashboard');
+      navigate(user.role === 'driver' ? '/trips' : user.role === 'safety_officer' ? '/drivers' : '/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
     } finally {

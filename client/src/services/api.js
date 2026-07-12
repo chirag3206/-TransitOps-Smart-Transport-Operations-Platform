@@ -30,6 +30,9 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
+    if (original.url.includes('/auth/login') || original.url.includes('/auth/refresh') || original.url.includes('/auth/register')) {
+      return Promise.reject(error);
+    }
     if (error.response?.status === 401 && !original._retry) {
       if (refreshing) {
         return new Promise((resolve, reject) => {

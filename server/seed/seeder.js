@@ -353,8 +353,7 @@ const seedData = async () => {
       userMap[u.email] = existing;
       continue;
     }
-    const hash = await bcrypt.hash(u.password, 12);
-    const user = await User.create({ ...u, password: hash, isVerified: true });
+    const user = await User.create({ ...u, isVerified: true });
     userMap[u.email] = user;
     console.log(`   ✓ ${u.role.padEnd(15)} ${u.email}`);
   }

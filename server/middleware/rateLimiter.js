@@ -45,7 +45,7 @@ const globalLimiter = createLimiter({
 // ─────────────────────────────────────────────
 const authLimiter = createLimiter({
   windowMs: 15 * 60 * 1000,              // 15 min window
-  max: 10,                                // 10 attempts max
+  max: 100,                                // 10 attempts max
   message: 'Too many login attempts. Please wait 15 minutes before trying again.',
   skipSuccessfulRequests: true,           // Only count failed attempts
 });
@@ -56,7 +56,7 @@ const authLimiter = createLimiter({
 // ─────────────────────────────────────────────
 const writeLimiter = createLimiter({
   windowMs: 10 * 60 * 1000,              // 10 min window
-  max: 60,                                // 60 write ops per 10 min
+  max: 600,                                // 60 write ops per 10 min
   message: 'Too many write operations. Please slow down and try again.',
 });
 
@@ -66,7 +66,7 @@ const writeLimiter = createLimiter({
 // ─────────────────────────────────────────────
 const analyticsLimiter = createLimiter({
   windowMs: 5 * 60 * 1000,              // 5 min window
-  max: 30,                               // 30 analytics requests per 5 min
+  max: 300,                               // 30 analytics requests per 5 min
   message: 'Too many analytics requests. Please wait a moment before refreshing.',
 });
 
