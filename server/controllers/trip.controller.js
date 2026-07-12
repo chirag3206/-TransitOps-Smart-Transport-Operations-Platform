@@ -35,13 +35,22 @@ const getTrips = async (req, res) => {
   const sort = parseSort(req.query, SORT_FIELDS);
 
   const filter = {};
-  if (req.query.status) filter.status = req.query.status;
-  if (req.query.vehicle) filter.vehicle = req.query.vehicle;
-  if (req.query.driver) filter.driver = req.query.driver;
+  if (req.user.role === 'driver') {
+    const driverDoc = await Driver.findOne({ email: req.user.email });
+    if (driverDoc) {
+      filter.driver = driverDoc._id;
+    } else {
+      filter.driver = new mongoose.Types.ObjectId(); // Ensure no results if profile doesn't exist
+    }
+  } else {
+    if (req.query.status) filter.status = req.query.status;
+    if (req.query.vehicle) filter.vehicle = req.query.vehicle;
+    if (req.query.driver) filter.driver = req.query.driver;
 
-  if (req.query.search) {
-    const regex = new RegExp(req.query.search.trim(), 'i');
-    filter.$or = [{ source: regex }, { destination: regex }];
+    if (req.query.search) {
+      const regex = new RegExp(req.query.search.trim(), 'i');
+      filter.$or = [{ source: regex }, { destination: regex }];
+    }
   }
 
   // Date range filter
@@ -55,7 +64,7 @@ const getTrips = async (req, res) => {
     Trip.find(filter)
       .sort(sort).skip(skip).limit(limit)
       .populate('vehicle', 'registrationNumber name type')
-      .populate('driver', 'name contactNumber licenseNumber')
+      .populate('driver', 'name contactNumber licenseNumber email')
       .populate('createdBy', 'name email')
       .lean({ virtuals: true }),
     Trip.countDocuments(filter),
@@ -68,7 +77,7 @@ const getTrips = async (req, res) => {
 // GET /api/trips/active
 // ─────────────────────────────────────────────
 const getActiveTrips = async (req, res) => {
-  const trips = await Trip.find({ status: TRIP_STATUS.DISPATCHED })
+  const trips = await Trip.find({ status: { $in: [TRIP_STATUS.DISPATCHED, TRIP_STATUS.IN_PROGRESS, TRIP_STATUS.PENDING_COMPLETION] } })
     .populate('vehicle', 'registrationNumber name type region')
     .populate('driver', 'name contactNumber')
     .sort({ dispatchedAt: -1 })
@@ -83,7 +92,7 @@ const getActiveTrips = async (req, res) => {
 const getTripById = async (req, res, next) => {
   const trip = await Trip.findById(req.params.id)
     .populate('vehicle', 'registrationNumber name type maxLoadCapacity')
-    .populate('driver', 'name contactNumber licenseNumber licenseCategory safetyScore')
+    .populate('driver', 'name contactNumber licenseNumber licenseCategory safetyScore email')
     .populate('createdBy', 'name email role')
     .lean({ virtuals: true });
 
@@ -122,7 +131,7 @@ const createTrip = async (req, res, next) => {
 
   const populated = await Trip.findById(trip._id)
     .populate('vehicle', 'registrationNumber name type maxLoadCapacity')
-    .populate('driver', 'name contactNumber licenseNumber')
+    .populate('driver', 'name contactNumber licenseNumber email')
     .lean({ virtuals: true });
 
   bustCache.trips();
@@ -136,6 +145,11 @@ const createTrip = async (req, res, next) => {
 const dispatchTrip = async (req, res, next) => {
   const trip = await Trip.findById(req.params.id);
   if (!trip) return next(new ApiError(404, 'Trip not found'));
+
+  // Only fleet_manager can dispatch
+  if (req.user.role !== 'fleet_manager') {
+    return next(new ApiError(403, 'Only fleet managers can dispatch trips.'));
+  }
 
   // Business rule: only Draft trips can be dispatched
   if (trip.status !== TRIP_STATUS.DRAFT) {
@@ -192,15 +206,11 @@ const dispatchTrip = async (req, res, next) => {
     return next(new ApiError(409, `Driver '${driver.name}' is already on an active trip`));
   }
 
-  // ── All checks passed — execute dispatch ──
-  const startOdometer = req.body.startOdometer ?? vehicle.odometer;
-
-  // Atomic updates using Promise.all
+  // ── All checks passed — execute dispatch (no odometer needed from manager) ──
   await Promise.all([
     Trip.findByIdAndUpdate(trip._id, {
       status: TRIP_STATUS.DISPATCHED,
       dispatchedAt: new Date(),
-      startOdometer,
     }),
     Vehicle.findByIdAndUpdate(trip.vehicle, { status: VEHICLE_STATUS.ON_TRIP }),
     Driver.findByIdAndUpdate(trip.driver, { status: DRIVER_STATUS.ON_TRIP }),
@@ -208,11 +218,99 @@ const dispatchTrip = async (req, res, next) => {
 
   const updated = await Trip.findById(trip._id)
     .populate('vehicle', 'registrationNumber name type')
-    .populate('driver', 'name contactNumber')
+    .populate('driver', 'name contactNumber email')
     .lean({ virtuals: true });
 
   bustCache.trips();
-  sendSuccess(res, 200, 'Trip dispatched successfully', updated);
+  sendSuccess(res, 200, 'Trip dispatched successfully. Driver has been notified.', updated);
+};
+
+// ─────────────────────────────────────────────
+// POST /api/trips/:id/driver-start
+// Dispatched → In Progress (Driver enters startOdometer)
+// ─────────────────────────────────────────────
+const driverStartTrip = async (req, res, next) => {
+  const trip = await Trip.findById(req.params.id);
+  if (!trip) return next(new ApiError(404, 'Trip not found'));
+
+  // Only the assigned driver can start the trip
+  if (req.user.role !== 'driver') {
+    return next(new ApiError(403, 'Only drivers can start trips.'));
+  }
+  const driverDoc = await Driver.findOne({ email: req.user.email });
+  if (!driverDoc || String(trip.driver) !== String(driverDoc._id)) {
+    return next(new ApiError(403, 'Access denied. You can only start your own assigned trips.'));
+  }
+
+  if (trip.status !== TRIP_STATUS.DISPATCHED) {
+    return next(new ApiError(400, `Only Dispatched trips can be started. Current status: '${trip.status}'`));
+  }
+
+  const { startOdometer } = req.body;
+  if (startOdometer == null || startOdometer < 0) {
+    return next(new ApiError(400, 'Start odometer reading is required and must be non-negative.'));
+  }
+
+  await Trip.findByIdAndUpdate(trip._id, {
+    status: TRIP_STATUS.IN_PROGRESS,
+    startOdometer,
+  });
+
+  const updated = await Trip.findById(trip._id)
+    .populate('vehicle', 'registrationNumber name type')
+    .populate('driver', 'name contactNumber email')
+    .lean({ virtuals: true });
+
+  bustCache.trips();
+  sendSuccess(res, 200, 'Trip started. Drive safe!', updated);
+};
+
+// ─────────────────────────────────────────────
+// POST /api/trips/:id/driver-finish
+// In Progress → Pending Completion (Driver enters endOdometer + fuelConsumed)
+// ─────────────────────────────────────────────
+const driverFinishTrip = async (req, res, next) => {
+  const trip = await Trip.findById(req.params.id);
+  if (!trip) return next(new ApiError(404, 'Trip not found'));
+
+  // Only the assigned driver can finish the trip
+  if (req.user.role !== 'driver') {
+    return next(new ApiError(403, 'Only drivers can finish trips.'));
+  }
+  const driverDoc = await Driver.findOne({ email: req.user.email });
+  if (!driverDoc || String(trip.driver) !== String(driverDoc._id)) {
+    return next(new ApiError(403, 'Access denied. You can only finish your own assigned trips.'));
+  }
+
+  if (trip.status !== TRIP_STATUS.IN_PROGRESS) {
+    return next(new ApiError(400, `Only In Progress trips can be finished. Current status: '${trip.status}'`));
+  }
+
+  const { endOdometer, fuelConsumed } = req.body;
+  if (endOdometer == null || endOdometer < 0) {
+    return next(new ApiError(400, 'End odometer reading is required and must be non-negative.'));
+  }
+  if (fuelConsumed == null || fuelConsumed < 0) {
+    return next(new ApiError(400, 'Fuel consumed is required and must be non-negative.'));
+  }
+  if (endOdometer < trip.startOdometer) {
+    return next(new ApiError(400, `End odometer (${endOdometer}) cannot be less than start odometer (${trip.startOdometer})`));
+  }
+
+  await Trip.findByIdAndUpdate(trip._id, {
+    status: TRIP_STATUS.PENDING_COMPLETION,
+    endOdometer,
+    fuelConsumed,
+    actualDistance: endOdometer - trip.startOdometer,
+  });
+
+  const updated = await Trip.findById(trip._id)
+    .populate('vehicle', 'registrationNumber name type')
+    .populate('driver', 'name contactNumber email')
+    .lean({ virtuals: true });
+
+  bustCache.trips();
+  sendSuccess(res, 200, 'Trip finished. Waiting for manager approval.', updated);
 };
 
 // ─────────────────────────────────────────────
@@ -223,33 +321,27 @@ const completeTrip = async (req, res, next) => {
   const trip = await Trip.findById(req.params.id);
   if (!trip) return next(new ApiError(404, 'Trip not found'));
 
-  // Business rule: only Dispatched trips can be completed
-  if (trip.status !== TRIP_STATUS.DISPATCHED) {
-    return next(new ApiError(400, `Only Dispatched trips can be completed. Current status: '${trip.status}'`));
+  // Only fleet_manager can approve completion
+  if (req.user.role !== 'fleet_manager') {
+    return next(new ApiError(403, 'Only fleet managers can approve trip completion.'));
   }
 
-  const { endOdometer, actualDistance, fuelConsumed, revenue } = req.body;
+  // Business rule: only Pending Completion trips can be completed
+  if (trip.status !== TRIP_STATUS.PENDING_COMPLETION) {
+    return next(new ApiError(400, `Only trips pending completion can be approved. Current status: '${trip.status}'`));
+  }
+
   const now = new Date();
-
-  // Compute actual distance from odometer if provided
-  let computedDistance = actualDistance;
-  if (endOdometer && trip.startOdometer) {
-    if (endOdometer < trip.startOdometer) {
-      return next(new ApiError(400, `End odometer (${endOdometer}) cannot be less than start odometer (${trip.startOdometer})`));
-    }
-    computedDistance = endOdometer - trip.startOdometer;
-  }
-
-  const finalRevenue = revenue ?? trip.revenue ?? 0;
+  const endOdometer = trip.endOdometer;
+  const fuelConsumed = trip.fuelConsumed;
+  const computedDistance = trip.actualDistance || (endOdometer && trip.startOdometer ? endOdometer - trip.startOdometer : trip.plannedDistance);
+  const finalRevenue = req.body.revenue ?? trip.revenue ?? 0;
   const finalDistance = computedDistance ?? trip.plannedDistance;
 
   // Update trip
   await Trip.findByIdAndUpdate(trip._id, {
     status: TRIP_STATUS.COMPLETED,
     completedAt: now,
-    endOdometer: endOdometer ?? null,
-    actualDistance: finalDistance,
-    fuelConsumed: fuelConsumed ?? null,
     revenue: finalRevenue,
   });
 
@@ -265,6 +357,37 @@ const completeTrip = async (req, res, next) => {
     },
   });
 
+  // If fuel was consumed, automatically create a FuelLog
+  if (fuelConsumed) {
+    try {
+      const FuelLog = require('../models/FuelLog');
+      const fuelPrice = 95; // standard dev fuel price in INR
+      const totalFuelCost = parseFloat((fuelConsumed * fuelPrice).toFixed(2));
+      const vehicle = await Vehicle.findById(trip.vehicle);
+
+      await FuelLog.create({
+        vehicle: trip.vehicle,
+        trip: trip._id,
+        liters: fuelConsumed,
+        pricePerLiter: fuelPrice,
+        totalCost: totalFuelCost,
+        date: now,
+        odometerReading: endOdometer ?? (vehicle.odometer + finalDistance),
+        location: 'Trip Destination',
+        fuelType: vehicle.fuelType || 'Diesel',
+        loggedBy: req.user._id,
+      });
+
+      // Update the vehicle's total fuel cost
+      const vehicleTotals = await FuelLog.getTotalCostForVehicle(trip.vehicle);
+      await Vehicle.findByIdAndUpdate(trip.vehicle, {
+        totalFuelCost: vehicleTotals.totalCost
+      });
+    } catch (fuelLogErr) {
+      console.error('Failed to create automatic FuelLog:', fuelLogErr);
+    }
+  }
+
   // Update driver: status → Available, trip stats
   await Driver.findByIdAndUpdate(trip.driver, {
     status: DRIVER_STATUS.AVAILABLE,
@@ -277,11 +400,11 @@ const completeTrip = async (req, res, next) => {
 
   const updated = await Trip.findById(trip._id)
     .populate('vehicle', 'registrationNumber name type')
-    .populate('driver', 'name contactNumber')
+    .populate('driver', 'name contactNumber email')
     .lean({ virtuals: true });
 
   bustCache.trips();
-  sendSuccess(res, 200, 'Trip completed successfully', updated);
+  sendSuccess(res, 200, 'Trip completed and approved successfully', updated);
 };
 
 // ─────────────────────────────────────────────
@@ -292,12 +415,24 @@ const cancelTrip = async (req, res, next) => {
   const trip = await Trip.findById(req.params.id);
   if (!trip) return next(new ApiError(404, 'Trip not found'));
 
-  // Business rule: cannot cancel a completed trip
+  // Driver ownership validation
+  if (req.user.role === 'driver') {
+    const driverDoc = await Driver.findOne({ email: req.user.email });
+    if (!driverDoc || String(trip.driver) !== String(driverDoc._id)) {
+      return next(new ApiError(403, 'Access denied. You can only manage your own assigned trips.'));
+    }
+  }
+
+  // Business rule: cannot cancel a completed or already cancelled trip
   if (trip.status === TRIP_STATUS.COMPLETED || trip.status === TRIP_STATUS.CANCELLED) {
     return next(new ApiError(400, `Cannot cancel a trip with status '${trip.status}'`));
   }
 
-  const wasDispatched = trip.status === TRIP_STATUS.DISPATCHED;
+  const wasActive = [
+    TRIP_STATUS.DISPATCHED,
+    TRIP_STATUS.IN_PROGRESS,
+    TRIP_STATUS.PENDING_COMPLETION,
+  ].includes(trip.status);
 
   await Trip.findByIdAndUpdate(trip._id, {
     status: TRIP_STATUS.CANCELLED,
@@ -305,8 +440,8 @@ const cancelTrip = async (req, res, next) => {
     cancellationReason: req.body.cancellationReason,
   });
 
-  // If was dispatched, free up vehicle and driver
-  if (wasDispatched) {
+  // If was active (dispatched/in-progress/pending), free up vehicle and driver
+  if (wasActive) {
     await Promise.all([
       Vehicle.findByIdAndUpdate(trip.vehicle, { status: VEHICLE_STATUS.AVAILABLE }),
       Driver.findByIdAndUpdate(trip.driver, {
@@ -318,7 +453,7 @@ const cancelTrip = async (req, res, next) => {
 
   const updated = await Trip.findById(trip._id)
     .populate('vehicle', 'registrationNumber name')
-    .populate('driver', 'name contactNumber')
+    .populate('driver', 'name contactNumber email')
     .lean({ virtuals: true });
 
   bustCache.trips();
@@ -356,7 +491,7 @@ const updateTrip = async (req, res, next) => {
     { $set: req.body },
     { new: true, runValidators: true, returnDocument: 'after' }
   ).populate('vehicle', 'registrationNumber name type')
-   .populate('driver', 'name contactNumber')
+   .populate('driver', 'name contactNumber email')
    .lean({ virtuals: true });
 
   bustCache.trips();
@@ -386,6 +521,8 @@ module.exports = {
   getTripById,
   createTrip,
   dispatchTrip,
+  driverStartTrip,
+  driverFinishTrip,
   completeTrip,
   cancelTrip,
   updateTrip,

@@ -23,25 +23,25 @@ const {
 const { protect, onlyFleetManager } = require('../middleware/auth');
 const { cacheMiddleware, CACHE_TTLS } = require('../middleware/cache');
 
-// All analytics require authentication + fleet_manager role
-router.use(protect, onlyFleetManager);
+// All analytics require authentication
+router.use(protect);
 
-// Dashboard KPIs — short TTL (live data)
+// Dashboard KPIs — short TTL (live data) (Accessible by driver and fleet_manager)
 router.get('/dashboard',         cacheMiddleware(CACHE_TTLS.DASHBOARD,  'analytics-dashboard'),   getDashboard);
 
 // Fleet utilization — medium TTL
-router.get('/fleet-utilization', cacheMiddleware(CACHE_TTLS.ANALYTICS,  'analytics-fleet'),       getFleetUtilization);
+router.get('/fleet-utilization', onlyFleetManager, cacheMiddleware(CACHE_TTLS.ANALYTICS,  'analytics-fleet'),       getFleetUtilization);
 
 // Trip performance
-router.get('/trip-performance',  cacheMiddleware(CACHE_TTLS.ANALYTICS,  'analytics-trips'),       getTripPerformance);
+router.get('/trip-performance',  onlyFleetManager, cacheMiddleware(CACHE_TTLS.ANALYTICS,  'analytics-trips'),       getTripPerformance);
 
 // Cost breakdown
-router.get('/cost-breakdown',    cacheMiddleware(CACHE_TTLS.ANALYTICS,  'analytics-costs'),       getCostBreakdown);
+router.get('/cost-breakdown',    onlyFleetManager, cacheMiddleware(CACHE_TTLS.ANALYTICS,  'analytics-costs'),       getCostBreakdown);
 
 // Driver statistics
-router.get('/driver-stats',      cacheMiddleware(CACHE_TTLS.ANALYTICS,  'analytics-drivers'),     getDriverStats);
+router.get('/driver-stats',      onlyFleetManager, cacheMiddleware(CACHE_TTLS.ANALYTICS,  'analytics-drivers'),     getDriverStats);
 
 // Monthly trend — longer TTL (historical data changes slowly)
-router.get('/monthly-trend',     cacheMiddleware(CACHE_TTLS.ANALYTICS,  'analytics-trend'),       getMonthlyTrend);
+router.get('/monthly-trend',     onlyFleetManager, cacheMiddleware(CACHE_TTLS.ANALYTICS,  'analytics-trend'),       getMonthlyTrend);
 
 module.exports = router;

@@ -28,9 +28,9 @@ const maintenanceSchema = new mongoose.Schema(
 
     description: {
       type: String,
-      required: [true, 'Description is required'],
       trim: true,
       maxlength: [500, 'Description cannot exceed 500 characters'],
+      default: '',
     },
 
     // ── Status ────────────────────────────────
@@ -40,7 +40,7 @@ const maintenanceSchema = new mongoose.Schema(
         values: Object.values(MAINTENANCE_STATUS),
         message: 'Invalid maintenance status',
       },
-      default: MAINTENANCE_STATUS.ACTIVE,
+      default: MAINTENANCE_STATUS.PENDING_APPROVAL,
     },
 
     // ── Cost ──────────────────────────────────
@@ -136,9 +136,11 @@ maintenanceSchema.virtual('finalCost').get(function () {
 // Static helpers
 // ─────────────────────────────────────────────
 
-/** Find active maintenance for a vehicle */
 maintenanceSchema.statics.findActiveForVehicle = function (vehicleId) {
-  return this.findOne({ vehicle: vehicleId, status: MAINTENANCE_STATUS.ACTIVE });
+  return this.findOne({
+    vehicle: vehicleId,
+    status: { $in: [MAINTENANCE_STATUS.PENDING_APPROVAL, MAINTENANCE_STATUS.IN_WORKSHOP] },
+  });
 };
 
 /** Get total maintenance cost for a vehicle */

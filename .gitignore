@@ -44,3 +44,10 @@ graphify-out/
 # Misc
 *.tgz
 .cache
+
+# Package locks (keep package-lock.json, ignore others)
+yarn.lock
+pnpm-lock.yaml
+
+# Gemini / AI agent data
+.gemini/

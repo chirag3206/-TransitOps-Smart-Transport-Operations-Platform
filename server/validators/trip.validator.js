@@ -48,28 +48,29 @@ const createTripRules = [
 ];
 
 const dispatchTripRules = [
+  // No odometer input needed from manager — just a confirmation
+];
+
+const driverStartRules = [
   body('startOdometer')
-    .optional()
+    .notEmpty().withMessage('Start odometer reading is required')
     .isFloat({ min: 0 }).withMessage('Start odometer cannot be negative')
     .toFloat(),
 ];
 
-const completeTripRules = [
+const driverFinishRules = [
   body('endOdometer')
-    .optional()
+    .notEmpty().withMessage('End odometer reading is required')
     .isFloat({ min: 0 }).withMessage('End odometer cannot be negative')
     .toFloat(),
 
-  body('actualDistance')
-    .optional()
-    .isFloat({ min: 0 }).withMessage('Actual distance cannot be negative')
-    .toFloat(),
-
   body('fuelConsumed')
-    .optional()
+    .notEmpty().withMessage('Fuel consumed is required')
     .isFloat({ min: 0 }).withMessage('Fuel consumed cannot be negative')
     .toFloat(),
+];
 
+const completeTripRules = [
   body('revenue')
     .optional()
     .isFloat({ min: 0 }).withMessage('Revenue cannot be negative')
@@ -96,6 +97,8 @@ module.exports = {
   validate,
   createTripRules,
   dispatchTripRules,
+  driverStartRules,
+  driverFinishRules,
   completeTripRules,
   cancelTripRules,
   listTripRules,

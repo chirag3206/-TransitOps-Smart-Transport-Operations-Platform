@@ -37,7 +37,7 @@ const getMaintenanceRecords = async (req, res) => {
   const [records, total] = await Promise.all([
     Maintenance.find(filter)
       .sort(sort).skip(skip).limit(limit)
-      .populate('vehicle', 'registrationNumber name type')
+      .populate('vehicle', 'registrationNumber name type make model')
       .populate('closedBy', 'name email')
       .lean({ virtuals: true }),
     Maintenance.countDocuments(filter),
@@ -51,7 +51,7 @@ const getMaintenanceRecords = async (req, res) => {
 // ─────────────────────────────────────────────
 const getMaintenanceById = async (req, res, next) => {
   const record = await Maintenance.findById(req.params.id)
-    .populate('vehicle', 'registrationNumber name type status odometer')
+    .populate('vehicle', 'registrationNumber name type status odometer make model')
     .populate('closedBy', 'name email')
     .lean({ virtuals: true });
 
@@ -75,26 +75,65 @@ const createMaintenance = async (req, res, next) => {
     ));
   }
 
-  // Business rule: cannot have two Active maintenance records
+  // Business rule: cannot have two Active/Pending maintenance records
   const existingActive = await Maintenance.findActiveForVehicle(vehicleId);
   if (existingActive) {
     return next(new ApiError(409,
-      `Vehicle '${vehicle.registrationNumber}' already has an active maintenance record (ID: ${existingActive._id}). Close it before opening a new one.`
+      `Vehicle '${vehicle.registrationNumber}' already has an active or pending maintenance record (ID: ${existingActive._id}). Close it before opening a new one.`
     ));
   }
 
-  // Create maintenance and update vehicle status to In Shop
+  // Create maintenance and update vehicle status to Pending Maintenance
   const [record] = await Promise.all([
-    Maintenance.create(req.body),
-    Vehicle.findByIdAndUpdate(vehicleId, { status: VEHICLE_STATUS.IN_SHOP }),
+    Maintenance.create({
+      ...req.body,
+      status: MAINTENANCE_STATUS.PENDING_APPROVAL,
+    }),
+    Vehicle.findByIdAndUpdate(vehicleId, { status: VEHICLE_STATUS.PENDING_MAINTENANCE }),
   ]);
 
   const populated = await Maintenance.findById(record._id)
-    .populate('vehicle', 'registrationNumber name type')
+    .populate('vehicle', 'registrationNumber name type make model')
     .lean({ virtuals: true });
 
   bustCache.maintenance();
-  sendSuccess(res, 201, `Maintenance record created. Vehicle '${vehicle.registrationNumber}' status set to In Shop.`, populated);
+  sendSuccess(res, 201, `Maintenance scheduled. Awaiting Safety Inspector approval. Vehicle '${vehicle.registrationNumber}' set to Pending Maintenance.`, populated);
+};
+
+// ─────────────────────────────────────────────
+// POST /api/maintenance/:id/approve
+// Pending Approval → In Workshop, vehicle → In Shop
+// ─────────────────────────────────────────────
+const approveMaintenance = async (req, res, next) => {
+  const record = await Maintenance.findById(req.params.id);
+  if (!record) return next(new ApiError(404, 'Maintenance record not found'));
+
+  if (record.status !== MAINTENANCE_STATUS.PENDING_APPROVAL) {
+    return next(new ApiError(400, `Only records pending approval can be approved. Current status: '${record.status}'`));
+  }
+
+  // Only safety_officer can approve
+  if (req.user.role !== 'safety_officer') {
+    return next(new ApiError(403, 'Access denied. Only Safety Inspectors can approve maintenance logs.'));
+  }
+
+  // Allow updating fields on approval (type, description, estimatedCost, workshopName, odometerReading, notes)
+  const updates = {
+    status: MAINTENANCE_STATUS.IN_WORKSHOP,
+    ...req.body,
+  };
+
+  await Promise.all([
+    Maintenance.findByIdAndUpdate(req.params.id, updates),
+    Vehicle.findByIdAndUpdate(record.vehicle, { status: VEHICLE_STATUS.IN_SHOP }),
+  ]);
+
+  const updated = await Maintenance.findById(req.params.id)
+    .populate('vehicle', 'registrationNumber name type make model')
+    .lean({ virtuals: true });
+
+  bustCache.maintenance();
+  sendSuccess(res, 200, 'Maintenance record approved and vehicle sent to workshop.', updated);
 };
 
 // ─────────────────────────────────────────────
@@ -107,6 +146,15 @@ const closeMaintenance = async (req, res, next) => {
 
   if (record.status === MAINTENANCE_STATUS.CLOSED) {
     return next(new ApiError(400, 'This maintenance record is already closed'));
+  }
+
+  if (record.status !== MAINTENANCE_STATUS.IN_WORKSHOP) {
+    return next(new ApiError(400, `Only records currently in workshop can be closed. Current status: '${record.status}'`));
+  }
+
+  // Only safety_officer can close/mark ready
+  if (req.user.role !== 'safety_officer') {
+    return next(new ApiError(403, 'Access denied. Only Safety Inspectors can mark maintenance as ready.'));
   }
 
   const { actualCost, endDate, notes } = req.body;
@@ -129,7 +177,7 @@ const closeMaintenance = async (req, res, next) => {
   });
 
   const updated = await Maintenance.findById(req.params.id)
-    .populate('vehicle', 'registrationNumber name type')
+    .populate('vehicle', 'registrationNumber name type make model')
     .populate('closedBy', 'name email')
     .lean({ virtuals: true });
 
@@ -158,7 +206,7 @@ const updateMaintenance = async (req, res, next) => {
     req.params.id,
     { $set: req.body },
     { new: true, runValidators: true, returnDocument: 'after' }
-  ).populate('vehicle', 'registrationNumber name type')
+  ).populate('vehicle', 'registrationNumber name type make model')
    .lean({ virtuals: true });
 
   bustCache.maintenance();
@@ -172,10 +220,10 @@ const deleteMaintenance = async (req, res, next) => {
   const record = await Maintenance.findById(req.params.id);
   if (!record) return next(new ApiError(404, 'Maintenance record not found'));
 
-  // Business rule: cannot delete an Active record (vehicle is In Shop)
-  if (record.status === MAINTENANCE_STATUS.ACTIVE) {
+  // Business rule: cannot delete active records (pending approval or in workshop)
+  if (record.status === MAINTENANCE_STATUS.PENDING_APPROVAL || record.status === MAINTENANCE_STATUS.IN_WORKSHOP) {
     return next(new ApiError(400,
-      'Cannot delete an Active maintenance record. Close it first to release the vehicle.'
+      'Cannot delete an active or pending maintenance record. Decline or close it first to release the vehicle.'
     ));
   }
 
@@ -188,6 +236,7 @@ module.exports = {
   getMaintenanceRecords,
   getMaintenanceById,
   createMaintenance,
+  approveMaintenance,
   closeMaintenance,
   updateMaintenance,
   deleteMaintenance,

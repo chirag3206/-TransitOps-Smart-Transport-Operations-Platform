@@ -109,7 +109,9 @@ export const tripAPI = {
   update: (id, data) => api.put(`/trips/${id}`, data),
   delete: (id) => api.delete(`/trips/${id}`),
   dispatch: (id, data) => api.post(`/trips/${id}/dispatch`, data || {}),
-  complete: (id, data) => api.post(`/trips/${id}/complete`, data),
+  driverStart: (id, data) => api.post(`/trips/${id}/driver-start`, data),
+  driverFinish: (id, data) => api.post(`/trips/${id}/driver-finish`, data),
+  complete: (id, data) => api.post(`/trips/${id}/complete`, data || {}),
   cancel: (id, data) => api.post(`/trips/${id}/cancel`, data),
 };
 
@@ -118,6 +120,7 @@ export const maintenanceAPI = {
   list: (params) => api.get('/maintenance', { params }),
   get: (id) => api.get(`/maintenance/${id}`),
   create: (data) => api.post('/maintenance', data),
+  approve: (id, data) => api.post(`/maintenance/${id}/approve`, data),
   close: (id, data) => api.post(`/maintenance/${id}/close`, data),
   update: (id, data) => api.put(`/maintenance/${id}`, data),
   delete: (id) => api.delete(`/maintenance/${id}`),

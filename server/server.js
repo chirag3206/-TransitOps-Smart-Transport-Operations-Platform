@@ -104,6 +104,9 @@ const startServer = async () => {
   try {
     await connectDB();
 
+    const { flushAll } = require('./middleware/cache');
+    flushAll();
+
     const server = app.listen(env.PORT, () => {
       logger.info(`🚛 TransitOps API running on port ${env.PORT} [${env.NODE_ENV}]`);
       logger.info(`📡 Health check: http://localhost:${env.PORT}/api/health`);

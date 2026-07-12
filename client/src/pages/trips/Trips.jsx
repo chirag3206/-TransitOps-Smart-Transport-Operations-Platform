@@ -19,8 +19,9 @@ const INIT_FORM = {
 };
 
 export default function Trips() {
-  const { isFleetManager, isDriver } = useAuth();
+  const { isFleetManager, isDriver, user } = useAuth();
   const canWrite = isFleetManager;
+  const canPerformActions = isFleetManager || isDriver;
 
   const [trips, setTrips]             = useState([]);
   const [vehicles, setVehicles]       = useState([]);
@@ -36,9 +37,7 @@ export default function Trips() {
   const [showDetail, setShowDetail]   = useState(null);
 
   const [form, setForm]               = useState(INIT_FORM);
-  const [completeForm, setCompleteForm] = useState({ endOdometer: '', fuelConsumed: '' });
   const [cancelForm, setCancelForm]   = useState({ cancellationReason: '' });
-  const [dispatchForm, setDispatchForm] = useState({ startOdometer: '' });
   const [saving, setSaving]           = useState(false);
   const [formError, setFormError]     = useState('');
 
@@ -47,20 +46,26 @@ export default function Trips() {
     try {
       const params = {};
       if (statusFilter) params.status = statusFilter;
-      const [tRes, vRes, dRes] = await Promise.all([
-        tripAPI.list(params),
-        vehicleAPI.available(),
-        driverAPI.available(),
-      ]);
-      setTrips(tRes.data.data || []);
-      setVehicles(vRes.data.data || []);
-      setDrivers(dRes.data.data || []);
+      
+      const promises = [tripAPI.list(params)];
+      if (canWrite) {
+        promises.push(vehicleAPI.available());
+        promises.push(driverAPI.available());
+      }
+
+      const results = await Promise.all(promises);
+      setTrips(results[0]?.data?.data || []);
+      
+      if (canWrite) {
+        setVehicles(results[1]?.data?.data || []);
+        setDrivers(results[2]?.data?.data || []);
+      }
     } catch (e) {
       setError(e.response?.data?.message || 'Failed to load trips');
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, canWrite]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -79,7 +84,7 @@ export default function Trips() {
     e.preventDefault();
     setSaving(true); setFormError('');
     try {
-      await tripAPI.dispatch(showDispatch._id, dispatchForm);
+      await tripAPI.dispatch(showDispatch._id);
       setShowDispatch(null); load();
     } catch (e) {
       setFormError(e.response?.data?.message || 'Failed to dispatch trip');
@@ -90,10 +95,10 @@ export default function Trips() {
     e.preventDefault();
     setSaving(true); setFormError('');
     try {
-      await tripAPI.complete(showComplete._id, completeForm);
+      await tripAPI.complete(showComplete._id);
       setShowComplete(null); load();
     } catch (e) {
-      setFormError(e.response?.data?.message || 'Failed to complete trip');
+      setFormError(e.response?.data?.message || 'Failed to approve trip completion');
     } finally { setSaving(false); }
   };
 
@@ -115,6 +120,11 @@ export default function Trips() {
         <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
           {row.plannedDistance} km · {fmt(row.cargoWeight)} kg cargo
         </div>
+        {(row.status === 'Completed' || row.status === 'Pending Completion') && row.fuelConsumed && (
+          <div style={{ fontSize: 11, color: row.status === 'Completed' ? '#10b981' : '#f59e0b', marginTop: 4 }}>
+            {row.status === 'Completed' ? '✓' : '⏳'} {row.computedDistance || row.actualDistance} km actual · {row.fuelConsumed} L fuel
+          </div>
+        )}
       </div>
     )},
     { header: 'Vehicle', key: 'vehicle', render: (v) => (
@@ -124,29 +134,36 @@ export default function Trips() {
     { header: 'Status', key: 'status', render: (v) => <StatusBadge status={v} /> },
     { header: 'Revenue', key: 'revenue', render: (v) => v ? `₹${fmt(v)}` : '—' },
     { header: 'Date', key: 'createdAt', render: (v) => fmtDate(v) },
-    ...(canWrite ? [{
-      header: 'Actions', key: '_id', render: (_, row) => (
-        <div className="table-actions">
-          <button className="btn btn-sm btn-ghost" onClick={() => setShowDetail(row)}>👁️</button>
-          {row.status === 'Draft' && (
-            <button className="btn btn-sm btn-primary" onClick={() => { setShowDispatch(row); setDispatchForm({ startOdometer: '' }); setFormError(''); }}>
-              🚀 Dispatch
-            </button>
-          )}
-          {row.status === 'Dispatched' && (
-            <button className="btn btn-sm btn-ghost" style={{ color: '#10b981' }}
-              onClick={() => { setShowComplete(row); setCompleteForm({ endOdometer: '', fuelConsumed: '' }); setFormError(''); }}>
-              ✅ Complete
-            </button>
-          )}
-          {(row.status === 'Draft' || row.status === 'Dispatched') && (
-            <button className="btn btn-sm btn-ghost" style={{ color: '#ef4444' }}
-              onClick={() => { setShowCancel(row); setCancelForm({ cancellationReason: '' }); }}>
-              ✕ Cancel
-            </button>
-          )}
-        </div>
-      )
+    ...(canPerformActions ? [{
+      header: 'Actions', key: '_id', render: (_, row) => {
+      const isOwnTrip = isDriver && row.driver?.email === user?.email;
+        const showDispatchBtn = row.status === 'Draft' && isFleetManager;
+        const showCompleteBtn = row.status === 'Pending Completion' && isFleetManager;
+        const showCancelBtn = ['Draft', 'Dispatched', 'In Progress'].includes(row.status) && isFleetManager;
+
+        return (
+          <div className="table-actions">
+            <button className="btn btn-sm btn-ghost" onClick={() => setShowDetail(row)} title="View Details">👁️</button>
+            {showDispatchBtn && (
+              <button className="btn btn-sm btn-primary" onClick={() => { setShowDispatch(row); setFormError(''); }}>
+                🚀 Dispatch
+              </button>
+            )}
+            {showCompleteBtn && (
+              <button className="btn btn-sm btn-ghost" style={{ color: '#10b981' }}
+                onClick={() => { setShowComplete(row); setFormError(''); }}>
+                ✅ Approve
+              </button>
+            )}
+            {showCancelBtn && (
+              <button className="btn btn-sm btn-ghost" style={{ color: '#ef4444' }}
+                onClick={() => { setShowCancel(row); setCancelForm({ cancellationReason: '' }); }}>
+                ✕ Cancel
+              </button>
+            )}
+          </div>
+        );
+      }
     }] : [{
       header: 'Actions', key: '_id', render: (_, row) => (
         <button className="btn btn-sm btn-ghost" onClick={() => setShowDetail(row)}>👁️ View</button>
@@ -171,7 +188,7 @@ export default function Trips() {
       <div className="filter-bar">
         <select className="input" value={statusFilter} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All Statuses</option>
-          {['Draft', 'Dispatched', 'Completed', 'Cancelled'].map((s) => <option key={s}>{s}</option>)}
+          {['Draft', 'Dispatched', 'In Progress', 'Pending Completion', 'Completed', 'Cancelled'].map((s) => <option key={s}>{s}</option>)}
         </select>
         <button className="btn btn-ghost" onClick={load}>↺ Refresh</button>
       </div>
@@ -235,42 +252,48 @@ export default function Trips() {
         </form>
       </Modal>
 
-      {/* Dispatch Modal */}
+      {/* Dispatch Confirmation Modal */}
       <Modal open={!!showDispatch} onClose={() => setShowDispatch(null)} title="Dispatch Trip" size="sm">
         <form onSubmit={handleDispatch}>
           {formError && <Alert type="error">{formError}</Alert>}
-          <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 16 }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 8 }}>
             Dispatching: <strong>{showDispatch?.source} → {showDispatch?.destination}</strong>
           </p>
-          <FormField label="Starting Odometer (km)" required>
-            <input className="input" type="number" value={dispatchForm.startOdometer}
-              onChange={(e) => setDispatchForm({ ...dispatchForm, startOdometer: +e.target.value })} required min="0" />
-          </FormField>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 16 }}>
+            The assigned driver (<strong>{showDispatch?.driver?.name}</strong>) will be notified and asked to enter odometer readings before starting the trip.
+          </p>
+          <div style={{ padding: '12px 16px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: 8, fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
+            🚛 Vehicle: <strong>{showDispatch?.vehicle?.registrationNumber}</strong><br />
+            📦 Cargo: <strong>{fmt(showDispatch?.cargoWeight)} kg</strong> · Distance: <strong>{showDispatch?.plannedDistance} km</strong>
+          </div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button type="button" className="btn btn-ghost" onClick={() => setShowDispatch(null)}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Dispatching...' : '🚀 Dispatch Now'}
+              {saving ? 'Dispatching...' : '🚀 Confirm Dispatch'}
             </button>
           </div>
         </form>
       </Modal>
 
-      {/* Complete Modal */}
-      <Modal open={!!showComplete} onClose={() => setShowComplete(null)} title="Complete Trip" size="sm">
+      {/* Approve Completion Modal */}
+      <Modal open={!!showComplete} onClose={() => setShowComplete(null)} title="Approve Trip Completion" size="sm">
         <form onSubmit={handleComplete}>
           {formError && <Alert type="error">{formError}</Alert>}
-          <FormField label="End Odometer (km)" required>
-            <input className="input" type="number" value={completeForm.endOdometer}
-              onChange={(e) => setCompleteForm({ ...completeForm, endOdometer: +e.target.value })} required />
-          </FormField>
-          <FormField label="Fuel Consumed (L)" required>
-            <input className="input" type="number" value={completeForm.fuelConsumed}
-              onChange={(e) => setCompleteForm({ ...completeForm, fuelConsumed: +e.target.value })} required />
-          </FormField>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 16 }}>
+            Review the driver's submitted data for: <strong>{showComplete?.source} → {showComplete?.destination}</strong>
+          </p>
+          <div style={{ padding: '16px', background: 'var(--bg-secondary)', borderRadius: 8, marginBottom: 16, fontSize: 14 }}>
+            <div className="detail-row"><span>Driver</span><strong>{showComplete?.driver?.name}</strong></div>
+            <div className="detail-row"><span>Vehicle</span><code>{showComplete?.vehicle?.registrationNumber}</code></div>
+            <div className="detail-row"><span>Start Odometer</span><strong>{showComplete?.startOdometer ? `${fmt(showComplete.startOdometer)} km` : '—'}</strong></div>
+            <div className="detail-row"><span>End Odometer</span><strong>{showComplete?.endOdometer ? `${fmt(showComplete.endOdometer)} km` : '—'}</strong></div>
+            <div className="detail-row"><span>Actual Distance</span><strong>{showComplete?.actualDistance ? `${fmt(showComplete.actualDistance)} km` : '—'}</strong></div>
+            <div className="detail-row"><span>Fuel Consumed</span><strong>{showComplete?.fuelConsumed ? `${showComplete.fuelConsumed} L` : '—'}</strong></div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button type="button" className="btn btn-ghost" onClick={() => setShowComplete(null)}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Completing...' : '✅ Mark Completed'}
+              {saving ? 'Approving...' : '✅ Approve & Complete'}
             </button>
           </div>
         </form>

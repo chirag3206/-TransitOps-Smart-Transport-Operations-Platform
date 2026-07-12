@@ -31,29 +31,33 @@ const getDrivers = async (req, res) => {
   const now = new Date();
 
   const filter = {};
-  if (req.query.status) filter.status = req.query.status;
-  if (req.query.licenseCategory) filter.licenseCategory = req.query.licenseCategory;
-  if (req.query.region) filter.region = req.query.region;
+  if (req.user.role === 'driver') {
+    filter.email = req.user.email;
+  } else {
+    if (req.query.status) filter.status = req.query.status;
+    if (req.query.licenseCategory) filter.licenseCategory = req.query.licenseCategory;
+    if (req.query.region) filter.region = req.query.region;
 
-  // License status filter using date arithmetic
-  if (req.query.licenseStatus === 'expired') {
-    filter.licenseExpiryDate = { $lt: now };
-  } else if (req.query.licenseStatus === 'expiring_soon') {
-    const threshold = new Date(now.getTime() + LICENSE_EXPIRY_WARNING_DAYS * 24 * 60 * 60 * 1000);
-    filter.licenseExpiryDate = { $gte: now, $lte: threshold };
-  } else if (req.query.licenseStatus === 'valid') {
-    const threshold = new Date(now.getTime() + LICENSE_EXPIRY_WARNING_DAYS * 24 * 60 * 60 * 1000);
-    filter.licenseExpiryDate = { $gt: threshold };
-  }
+    // License status filter using date arithmetic
+    if (req.query.licenseStatus === 'expired') {
+      filter.licenseExpiryDate = { $lt: now };
+    } else if (req.query.licenseStatus === 'expiring_soon') {
+      const threshold = new Date(now.getTime() + LICENSE_EXPIRY_WARNING_DAYS * 24 * 60 * 60 * 1000);
+      filter.licenseExpiryDate = { $gte: now, $lte: threshold };
+    } else if (req.query.licenseStatus === 'valid') {
+      const threshold = new Date(now.getTime() + LICENSE_EXPIRY_WARNING_DAYS * 24 * 60 * 60 * 1000);
+      filter.licenseExpiryDate = { $gt: threshold };
+    }
 
-  // Text search across name, contact, license
-  if (req.query.search) {
-    const regex = new RegExp(req.query.search.trim(), 'i');
-    filter.$or = [
-      { name: regex },
-      { licenseNumber: regex },
-      { contactNumber: regex },
-    ];
+    // Text search across name, contact, license
+    if (req.query.search) {
+      const regex = new RegExp(req.query.search.trim(), 'i');
+      filter.$or = [
+        { name: regex },
+        { licenseNumber: regex },
+        { contactNumber: regex },
+      ];
+    }
   }
 
   const [drivers, total] = await Promise.all([
@@ -67,7 +71,10 @@ const getDrivers = async (req, res) => {
 // ─────────────────────────────────────────────
 // GET /api/drivers/available
 // ─────────────────────────────────────────────
-const getAvailableDrivers = async (req, res) => {
+const getAvailableDrivers = async (req, res, next) => {
+  if (req.user.role === 'driver') {
+    return next(new ApiError(403, 'Access denied. Drivers cannot view the available dispatch pool.'));
+  }
   const drivers = await Driver.findAvailable({
     ...(req.query.licenseCategory && { licenseCategory: req.query.licenseCategory }),
     ...(req.query.region && { region: req.query.region }),
@@ -96,6 +103,11 @@ const getExpiringLicenses = async (req, res) => {
 const getDriverById = async (req, res, next) => {
   const driver = await Driver.findById(req.params.id).lean({ virtuals: true });
   if (!driver) return next(new ApiError(404, `Driver not found`));
+
+  if (req.user.role === 'driver' && driver.email !== req.user.email) {
+    return next(new ApiError(403, 'Access denied. You can only view your own profile.'));
+  }
+
   sendSuccess(res, 200, 'Driver retrieved successfully', driver);
 };
 
@@ -246,6 +258,10 @@ const updateSafetyScore = async (req, res, next) => {
 const getDriverSummary = async (req, res, next) => {
   const driver = await Driver.findById(req.params.id).lean({ virtuals: true });
   if (!driver) return next(new ApiError(404, 'Driver not found'));
+
+  if (req.user.role === 'driver' && driver.email !== req.user.email) {
+    return next(new ApiError(403, 'Access denied. You can only view your own summary.'));
+  }
 
   const [recentTrips, activeTrip] = await Promise.all([
     Trip.find({ driver: req.params.id })

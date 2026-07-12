@@ -7,6 +7,7 @@
 const VEHICLE_STATUS = {
   AVAILABLE: 'Available',
   ON_TRIP: 'On Trip',
+  PENDING_MAINTENANCE: 'Pending Maintenance',
   IN_SHOP: 'In Shop',
   RETIRED: 'Retired',
 };
@@ -14,6 +15,7 @@ const VEHICLE_STATUS = {
 // Statuses that block vehicle from dispatch
 const VEHICLE_BLOCKED_STATUSES = [
   VEHICLE_STATUS.ON_TRIP,
+  VEHICLE_STATUS.PENDING_MAINTENANCE,
   VEHICLE_STATUS.IN_SHOP,
   VEHICLE_STATUS.RETIRED,
 ];
@@ -60,13 +62,16 @@ const LICENSE_CATEGORY = {
 const TRIP_STATUS = {
   DRAFT: 'Draft',
   DISPATCHED: 'Dispatched',
+  IN_PROGRESS: 'In Progress',
+  PENDING_COMPLETION: 'Pending Completion',
   COMPLETED: 'Completed',
   CANCELLED: 'Cancelled',
 };
 
 // Maintenance statuses
 const MAINTENANCE_STATUS = {
-  ACTIVE: 'Active',
+  PENDING_APPROVAL: 'Pending Approval',
+  IN_WORKSHOP: 'In Workshop',
   CLOSED: 'Closed',
 };
 

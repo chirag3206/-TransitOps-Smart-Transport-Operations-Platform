@@ -33,7 +33,8 @@ function ProtectedRoute({ children, allowedRoles }) {
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/dashboard" replace />;
+    const fallback = user.role === 'safety_officer' ? '/vehicles' : '/dashboard';
+    return <Navigate to={fallback} replace />;
   }
 
   return children;
@@ -45,7 +46,7 @@ function App() {
   return (
     <Routes>
       {/* Public Route */}
-      <Route path="/login" element={user ? <Navigate to={user.role === 'driver' ? '/trips' : user.role === 'safety_officer' ? '/drivers' : '/dashboard'} replace /> : <Login />} />
+      <Route path="/login" element={user ? <Navigate to={user.role === 'safety_officer' ? '/vehicles' : '/dashboard'} replace /> : <Login />} />
 
       {/* Protected Routes with Layout */}
       <Route element={
@@ -53,24 +54,24 @@ function App() {
           <Layout />
         </ProtectedRoute>
       }>
-        <Route path="/" element={<Navigate to={user?.role === 'driver' ? '/trips' : user?.role === 'safety_officer' ? '/drivers' : '/dashboard'} replace />} />
+        <Route path="/" element={<Navigate to={user?.role === 'safety_officer' ? '/vehicles' : '/dashboard'} replace />} />
         
         {/* Role Specific Routes */}
         <Route path="/dashboard" element={
-          <ProtectedRoute allowedRoles={['fleet_manager']}>
+          <ProtectedRoute allowedRoles={['fleet_manager', 'driver']}>
             <Dashboard />
           </ProtectedRoute>
         } />
 
         {/* Role Specific Routes */}
         <Route path="/vehicles" element={
-          <ProtectedRoute allowedRoles={['fleet_manager']}>
+          <ProtectedRoute allowedRoles={['fleet_manager', 'safety_officer']}>
             <Vehicles />
           </ProtectedRoute>
         } />
         
         <Route path="/drivers" element={
-          <ProtectedRoute allowedRoles={['fleet_manager', 'safety_officer']}>
+          <ProtectedRoute allowedRoles={['fleet_manager']}>
             <Drivers />
           </ProtectedRoute>
         } />
@@ -82,7 +83,7 @@ function App() {
         } />
         
         <Route path="/maintenance" element={
-          <ProtectedRoute allowedRoles={['fleet_manager']}>
+          <ProtectedRoute allowedRoles={['fleet_manager', 'safety_officer']}>
             <Maintenance />
           </ProtectedRoute>
         } />
