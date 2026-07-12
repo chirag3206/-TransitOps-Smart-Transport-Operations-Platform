@@ -123,14 +123,15 @@ const getCacheStats = () => cache.getStats();
 // Pre-configured TTL constants per resource
 // ─────────────────────────────────────────────
 const CACHE_TTLS = {
-  DASHBOARD:   60,   // 1 min — KPIs update frequently
-  VEHICLES:   120,   // 2 min — vehicle list changes on dispatch
-  DRIVERS:    120,   // 2 min — driver list changes on dispatch
-  TRIPS:       60,   // 1 min — trips are time-sensitive
-  MAINTENANCE: 180,  // 3 min — maintenance logs change less often
-  FUEL_LOGS:  300,   // 5 min — fuel logs rarely change
-  EXPENSES:   300,   // 5 min — expenses rarely change
-  ANALYTICS:  120,   // 2 min — reports are expensive, cache aggressively
+  DEFAULT:     300,  // 5 min — generic fallback
+  DASHBOARD:    60,   // 1 min — KPIs update frequently
+  VEHICLES:    120,   // 2 min — vehicle list changes on dispatch
+  DRIVERS:     120,   // 2 min — driver list changes on dispatch
+  TRIPS:        60,   // 1 min — trips are time-sensitive
+  MAINTENANCE:  180,  // 3 min — maintenance logs change less often
+  FUEL_LOGS:   300,   // 5 min — fuel logs rarely change
+  EXPENSES:    300,   // 5 min — expenses rarely change
+  ANALYTICS:   120,   // 2 min — reports are expensive, cache aggressively
 };
 
 module.exports = {
